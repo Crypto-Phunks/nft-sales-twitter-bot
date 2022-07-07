@@ -1,0 +1,26 @@
+{
+  "eth": {
+    "symbol": "Ξ"
+  },
+  "usd": {
+    "symbol": "$"
+  },
+  "cad": {
+    "symbol": "$"
+  },
+  "eur": {
+    "symbol": "€"
+  },
+  "gbp": {
+    "symbol": "£"
+  },
+  "aud": {
+    "symbol": "$"
+  },
+  "cny": {
+    "symbol": "¥"
+  },
+  "jpy": {
+    "symbol": "¥"
+  }
+}
