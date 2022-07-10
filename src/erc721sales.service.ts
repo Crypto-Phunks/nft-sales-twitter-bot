@@ -228,6 +228,14 @@ export class Erc721SalesService extends BaseService {
         alternateValue = parseFloat(OPENSEA_SEAPORT[0].toString())/1000;
       }
 
+
+      // if there is an NFTX swap involved, ignore this transfer
+      const swaps = receipt.logs.filter((log2: any) => log2.topics[0].toLowerCase() === '0x7af2bc3f8ec800c569b6555feaf16589d96a9d04a49d1645fd456d75fa0b372b')
+      if (swaps.length) {
+        console.log('nftx swap involved in this transaction, ignoring it')
+        return
+      }
+
       // If ens is configured, get ens addresses
       let ensTo: string;
       let ensFrom: string;
