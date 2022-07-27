@@ -1,6 +1,6 @@
 export const config = {
   // Contract Address ======================================== //
-  contract_address: '0x0Ee80069c9B4993882fe0b3fc256260EfF385982',
+  contract_address: '0xf07468eAd8cf26c752C676E43C814FEe9c8CF402',
   //
   // uncomment the 2 lines above to use local images instead of retrieving images from ipfs for each tweet
   use_local_images: true,

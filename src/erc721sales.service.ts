@@ -45,14 +45,13 @@ export class Erc721SalesService extends BaseService {
         else if (config.includeFreeMint) this.tweet(res);
       });
     });
-
-    /*
+    
 
     // this code snippet can be useful to test a specific transaction //
-
+    /*
     const tokenContract = new ethers.Contract(config.contract_address, erc721abi, this.provider);
     let filter = tokenContract.filters.Transfer();
-    const startingBlock = 15080923  
+    const startingBlock = 15220657  
     tokenContract.queryFilter(filter, 
       startingBlock, 
       startingBlock+1).then(events => {
@@ -169,6 +168,9 @@ export class Erc721SalesService extends BaseService {
       const NLL = receipt.logs.map((log: any) => {
         if (log.topics[0].toLowerCase() === '0x975c7be5322a86cddffed1e3e0e55471a764ac2764d25176ceb8e17feef9392c') {
           const relevantData = log.data.substring(2);
+          if (tokenId !== parseInt(log.topics[1], 16).toString()) {
+            return
+          }
           return BigInt(`0x${relevantData}`) / BigInt('1000000000000000')
         }
       }).filter(n => n !== undefined)
