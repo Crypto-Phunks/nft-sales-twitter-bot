@@ -28,7 +28,7 @@ export class PhunksBidService extends BaseService {
         ensFrom = await this.provider.lookupAddress(`${from}`);
       }      
       const request:TweetRequest = {
-        from: ensFrom ?? from,
+        from: ensFrom ?? this.shortenAddress(from),
         tokenId: token,
         ether: parseFloat(value),
         transactionHash: event.transactionHash,
