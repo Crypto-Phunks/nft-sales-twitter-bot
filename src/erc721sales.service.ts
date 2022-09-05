@@ -45,13 +45,12 @@ export class Erc721SalesService extends BaseService {
         else if (config.includeFreeMint) this.tweet(res);
       });
     });
-    
 
     // this code snippet can be useful to test a specific transaction //
-    /*
+    return
     const tokenContract = new ethers.Contract(config.contract_address, erc721abi, this.provider);
     let filter = tokenContract.filters.Transfer();
-    const startingBlock = 15220657  
+    const startingBlock = 15710313  
     tokenContract.queryFilter(filter, 
       startingBlock, 
       startingBlock+1).then(events => {
@@ -68,7 +67,6 @@ export class Erc721SalesService extends BaseService {
         });     
       }
     });
-    */
   }
 
   async getTransactionDetails(tx: ethers.Event): Promise<any> {
@@ -146,7 +144,8 @@ export class Erc721SalesService extends BaseService {
               return BigInt(`0x${relevantDataSlice[1]}`)
             })
           if (buys.length) {
-            return buys.reduce((previous, current) => previous + current, BigInt(0)) / BigInt('1000000000000000')
+            const spent = buys.reduce((previous, current) => previous + current, BigInt(0)) / BigInt('100000000000000000')
+            return spent
           } else {
             // we're still missing the funds, check swap of weth
             const swaps = receipt.logs.filter((log2: any) => log2.topics[0].toLowerCase() === '0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822')
@@ -157,7 +156,7 @@ export class Erc721SalesService extends BaseService {
                 if (moneyIn > BigInt(0))
                   return moneyIn / BigInt('1000000000000000');
               })
-            if (swaps.length) return swaps[0]
+            if (swaps.length) return swaps.reduce((previous, current) => previous + current, BigInt(0))
           }
         }
       }).filter(n => n !== undefined)
