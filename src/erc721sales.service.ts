@@ -10,6 +10,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import looksRareABI from './abi/looksRareABI.json';
+import blurABI from './abi/blur.json';
 import nftxABI from './abi/nftxABI.json';
 import openseaSeaportABI from './abi/seaportABI.json';
 
@@ -17,8 +18,10 @@ import { config } from './config';
 import { BaseService, TweetRequest, TweetType } from './base.service';
 
 const looksRareContractAddress = '0x59728544b08ab483533076417fbbb2fd0b17ce3a'; // Don't change unless deprecated
+const blurContractAddress = '0x000000000000ad05ccc4f10045630fb830b95127';
 
 const looksInterface = new ethers.utils.Interface(looksRareABI);
+const blurInterface = new ethers.utils.Interface(blurABI);
 const nftxInterface = new ethers.utils.Interface(nftxABI);
 const seaportInterface = new ethers.utils.Interface(openseaSeaportABI);
 
@@ -187,6 +190,12 @@ export class Erc721SalesService extends BaseService {
           return amount
         }
       }).filter(n => n !== undefined)  
+
+      const BLUR_IO = receipt.logs.map((log: any) => {
+        if (log.address.toLowerCase() === blurContractAddress.toLowerCase()) {  
+          return blurInterface.parseLog(log);
+        }
+      }).filter(l => l?.name === 'OrdersMatched' && l?.args.buy.tokenId.toString() === tokenId)
       
       const OPENSEA_SEAPORT = receipt.logs.map((log: any) => {
         if (log.topics[0].toLowerCase() === '0x9d9af8e38d66c62e2c12f0225249fd9d721c54b83f48d9352c97c6cacdcb6f31') {
@@ -227,6 +236,10 @@ export class Erc721SalesService extends BaseService {
         alternateValue = parseFloat(X2Y2[0].toString())/1000;
       } else if (OPENSEA_SEAPORT.length) {
         alternateValue = parseFloat(OPENSEA_SEAPORT[0].toString())/1000;
+      } else if (BLUR_IO.length) {
+        const weiValue = (BLUR_IO[0]?.args?.buy.price)?.toString();
+        const value = ethers.utils.formatEther(weiValue);
+        alternateValue = parseFloat(value);
       }
 
 
