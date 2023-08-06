@@ -10,6 +10,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import looksRareABI from './abi/looksRareABI.json';
+import looksRareABIv2 from './abi/looksRareABIv2.json';
 import blurABI from './abi/blur.json';
 import nftxABI from './abi/nftxABI.json';
 import openseaSeaportABI from './abi/seaportABI.json';
@@ -18,9 +19,12 @@ import { config } from './config';
 import { BaseService, TweetRequest, TweetType } from './base.service';
 
 const looksRareContractAddress = '0x59728544b08ab483533076417fbbb2fd0b17ce3a'; // Don't change unless deprecated
+const looksRareContractAddressV2 = '0x0000000000e655fae4d56241588680f86e3b2377'; // Don't change unless deprecated
+
 const blurContractAddress = '0x000000000000ad05ccc4f10045630fb830b95127';
 
 const looksInterface = new ethers.utils.Interface(looksRareABI);
+const looksInterfaceV2 = new ethers.utils.Interface(looksRareABIv2);
 const blurInterface = new ethers.utils.Interface(blurABI);
 const nftxInterface = new ethers.utils.Interface(nftxABI);
 const seaportInterface = new ethers.utils.Interface(openseaSeaportABI);
@@ -125,6 +129,13 @@ export class Erc721SalesService extends BaseService {
       }).filter((log: any) => (log?.name === 'TakerAsk' || log?.name === 'TakerBid') &&
         log?.args.tokenId == tokenId);
       
+      const LRV2 = receipt.logs.map((log: any) => {
+        if (log.address.toLowerCase() === looksRareContractAddressV2.toLowerCase()) {  
+          return looksInterfaceV2.parseLog(log);
+        }
+      }).filter((log: any) => (log?.name === 'TakerAsk' || log?.name === 'TakerBid') &&
+        log?.args.itemIds.indexOf(tokenId));        
+      
       const NFTX = receipt.logs.map((log: any) => {
         // direct buy from vault
         if (log.topics[0].toLowerCase() === '0x1cdb5ee3c47e1a706ac452b89698e5e3f2ff4f835ca72dde8936d0f4fcf37d81') {  
@@ -222,6 +233,10 @@ export class Erc721SalesService extends BaseService {
 
       if (LR.length) {
         const weiValue = (LR[0]?.args?.price)?.toString();
+        const value = ethers.utils.formatEther(weiValue);
+        alternateValue = parseFloat(value);
+      } else if (LRV2.length) {
+        const weiValue = (LRV2[0]?.args?.feeAmounts[0])?.toString();
         const value = ethers.utils.formatEther(weiValue);
         alternateValue = parseFloat(value);
       } else if (NFTX.length) {
