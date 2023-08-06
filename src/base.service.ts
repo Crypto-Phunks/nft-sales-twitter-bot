@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import fs from 'fs';
-import twit from 'twit';
+import { EUploadMimeType, TwitterApi } from 'twitter-api-v2';
 
 import { ethers } from 'ethers';
 
@@ -24,14 +24,12 @@ const tokenContractAddress = config.contract_address;
 
 const provider = new ethers.providers.JsonRpcProvider(alchemyAPIUrl + alchemyAPIKey);
 
-const twitterConfig = {
-  consumer_key: process.env.TW_CONSUMER_KEY,
-  consumer_secret: process.env.TW_CONSUMER_SECRET,
-  access_token: process.env.TW_ACCESS_TOKEN_KEY,
-  access_token_secret: process.env.TW_ACCESS_TOKEN_SECRET,
-};
-
-const twitterClient = new twit(twitterConfig);
+const v2Client = new TwitterApi({
+  accessToken: process.env.TWITTER_ACCESS_TOKEN_KEY,
+  accessSecret: process.env.TWITTER_ACCESS_TOKEN_SECRET,
+  appKey: process.env.TWITTER_API_KEY,
+  appSecret: process.env.TWITTER_API_KEY_SECRET,
+});
 
 export enum TweetType {
   SALE,
@@ -113,41 +111,49 @@ export class BaseService {
     // Format our image to base64
     const image = config.use_local_images ? data.imageUrl : this.transformImage(data.imageUrl);
 
-    let processedImage: string;
-    if (image) processedImage = await this.getBase64(image);
+    let processedImage: Buffer | undefined;
+    if (image) processedImage = await this.getImageFile(image);
 
-    let media_ids: Array<string>;
+    let media_id: string;
     if (processedImage) {
       // Upload the item's image to Twitter & retrieve a reference to it
-      media_ids = await new Promise((resolve) => {
-        twitterClient.post('media/upload', { media_data: processedImage }, (error, media: any) => {
-          resolve(error ? null : [media.media_id_string]);
-        });
+      media_id = await v2Client.v1.uploadMedia(processedImage, {
+        mimeType: EUploadMimeType.Png,
       });
     }
 
-    let tweet: any = { status: tweetText };
-    if (media_ids) tweet.media_ids = media_ids;
-
     // Post the tweet 👇
     // If you need access to this endpoint, you’ll need to apply for Elevated access via the Developer Portal. You can learn more here: https://developer.twitter.com/en/docs/twitter-api/getting-started/about-twitter-api#v2-access-leve
-    twitterClient.post('statuses/update', tweet, (error) => {
-      if (!error) console.log(`Successfully tweeted: ${tweetText}`);
-      else console.error(error);
-    });
+    const { data: createdTweet, errors: errors } = await v2Client.v2.tweet(
+      tweetText,
+      { media: { media_ids: [media_id] } },
+    );
+    if (!errors) {
+      console.log(
+        `Successfully tweeted: ${createdTweet.id} -> ${createdTweet.text}`,
+      );
+      return data;
+    } else {
+      console.error(errors);
+      return null;
+    }
   }
 
-  async getBase64(url: string) {
-    if (url.startsWith('http')) {
-      return await firstValueFrom(
-        this.http.get(url, { responseType: 'arraybuffer' }).pipe(
-          map((res) => Buffer.from(res.data, 'binary').toString('base64')),
-          catchError(() => of(null))
-        )
-      );
-    } else {
-      return fs.readFileSync(url, {encoding: 'base64'});
-    }
+  async getImageFile(url: string): Promise<Buffer | undefined> {
+    return new Promise((resolve, _) => {
+      if (url.startsWith('http')) {
+        this.http.get(url, { responseType: 'arraybuffer' }).subscribe((res) => {
+          if (res.data) {
+            const file = Buffer.from(res.data, 'binary');
+            resolve(file);
+          } else {
+            resolve(undefined);
+          }
+        });
+      } else {
+        resolve(fs.readFileSync(url));
+      }
+    });
   }
   
   getEthToFiat(): Observable<any> {
