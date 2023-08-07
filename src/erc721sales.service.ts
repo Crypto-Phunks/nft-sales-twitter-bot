@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import {
-  TransactionReceipt
+  TransactionReceipt,
+  Log
 } from "@ethersproject/abstract-provider";
 import { BigNumber, ethers } from 'ethers';
 import { hexToNumberString } from 'web3-utils';
@@ -12,6 +13,7 @@ dotenv.config();
 import looksRareABI from './abi/looksRareABI.json';
 import looksRareABIv2 from './abi/looksRareABIv2.json';
 import blurABI from './abi/blur.json';
+import blurSalesABI from './abi/blurSales.json';
 import nftxABI from './abi/nftxABI.json';
 import openseaSeaportABI from './abi/seaportABI.json';
 
@@ -22,10 +24,13 @@ const looksRareContractAddress = '0x59728544b08ab483533076417fbbb2fd0b17ce3a'; /
 const looksRareContractAddressV2 = '0x0000000000e655fae4d56241588680f86e3b2377'; // Don't change unless deprecated
 
 const blurContractAddress = '0x000000000000ad05ccc4f10045630fb830b95127';
+const blurSalesContractAddress = '0xb2ecfe4e4d61f8790bbb9de2d1259b9e2410cea5';
+const blurBiddingContractAddress = '0x0000000000a39bb272e79075ade125fd351887ac';
 
 const looksInterface = new ethers.utils.Interface(looksRareABI);
 const looksInterfaceV2 = new ethers.utils.Interface(looksRareABIv2);
 const blurInterface = new ethers.utils.Interface(blurABI);
+const blurSalesInterface = new ethers.utils.Interface(blurSalesABI);
 const nftxInterface = new ethers.utils.Interface(nftxABI);
 const seaportInterface = new ethers.utils.Interface(openseaSeaportABI);
 
@@ -197,6 +202,19 @@ export class Erc721SalesService extends BaseService {
         }
       }).filter(l => l?.name === 'OrdersMatched' && l?.args.buy.tokenId.toString() === tokenId)
       
+      const BLUR_IO_SALES = receipt.logs
+        .filter(l => l.address.toLowerCase() === blurBiddingContractAddress.toLowerCase())
+        .filter(l => {
+          // find payment to blur
+          return ethers.utils.defaultAbiCoder.decode(['address'], l?.topics[2])[0].toLowerCase() === blurSalesContractAddress.toLowerCase()
+        })
+        .map(l => {
+          const relevantData = l.data.substring(2);
+          const relevantDataSlice = relevantData.match(/.{1,64}/g);
+          const amount = BigInt(`0x${relevantDataSlice[0]}`)
+          return amount
+        })
+      
       const OPENSEA_SEAPORT = receipt.logs.map((log: any) => {
         if (log.topics[0].toLowerCase() === '0x9d9af8e38d66c62e2c12f0225249fd9d721c54b83f48d9352c97c6cacdcb6f31') {
           const logDescription = seaportInterface.parseLog(log);
@@ -244,8 +262,11 @@ export class Erc721SalesService extends BaseService {
         const weiValue = (BLUR_IO[0]?.args?.buy.price)?.toString();
         const value = ethers.utils.formatEther(weiValue);
         alternateValue = parseFloat(value);
+      } else if (BLUR_IO_SALES.length) {
+        const weiValue = BLUR_IO_SALES.reduce((previous,current) => previous + current, BigInt(0));
+        const value = ethers.utils.formatEther(weiValue/BigInt(BLUR_IO_SALES.length));
+        alternateValue = parseFloat(value);
       }
-
 
       // if there is an NFTX swap involved, ignore this transfer
       const swaps = receipt.logs.filter((log2: any) => log2.topics[0].toLowerCase() === '0x7af2bc3f8ec800c569b6555feaf16589d96a9d04a49d1645fd456d75fa0b372b')
