@@ -34,6 +34,7 @@ const v2Client = new TwitterApi({
 export enum TweetType {
   SALE,
   AUCTION_SETTLED,
+  FLYWHEEL_SOLD,
   BID_ENTERED
 }
 
@@ -94,7 +95,8 @@ export class BaseService {
   async tweet(data: TweetRequest) {
 
     let tweetText: string = data.type === TweetType.SALE ? config.saleMessage : 
-                            data.type === TweetType.BID_ENTERED ? config.bidMessage : config.auctionMessage;
+                            data.type === TweetType.BID_ENTERED ? config.bidMessage : 
+                            data.type === TweetType.FLYWHEEL_SOLD ? config.flywheelMessage : config.auctionMessage;;
 
     // Cash value
     const fiatValue = this.fiatValues[config.currency] * (data.alternateValue ? data.alternateValue : data.ether);
