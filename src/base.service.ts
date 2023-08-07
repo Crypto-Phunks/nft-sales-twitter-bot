@@ -33,6 +33,7 @@ const v2Client = new TwitterApi({
 
 export enum TweetType {
   SALE,
+  AUCTION_SETTLED,
   BID_ENTERED
 }
 
@@ -44,6 +45,7 @@ export interface TweetRequest {
   transactionHash: string;
   alternateValue: number;
   imageUrl?: string;
+  additionalText?: string;
   type:TweetType;
 }
 
@@ -91,7 +93,8 @@ export class BaseService {
 
   async tweet(data: TweetRequest) {
 
-    let tweetText: string = data.type === TweetType.SALE ? config.saleMessage : config.bidMessage;
+    let tweetText: string = data.type === TweetType.SALE ? config.saleMessage : 
+                            data.type === TweetType.BID_ENTERED ? config.bidMessage : config.auctionMessage;
 
     // Cash value
     const fiatValue = this.fiatValues[config.currency] * (data.alternateValue ? data.alternateValue : data.ether);
@@ -107,6 +110,7 @@ export class BaseService {
     tweetText = tweetText.replace(new RegExp('<from>', 'g'), data.from);
     tweetText = tweetText.replace(new RegExp('<to>', 'g'), data.to);
     tweetText = tweetText.replace(new RegExp('<fiatPrice>', 'g'), fiat.format());
+    tweetText = tweetText.replace(new RegExp('<additionalText>', 'g'), data.additionalText);
 
     // Format our image to base64
     const image = config.use_local_images ? data.imageUrl : this.transformImage(data.imageUrl);
