@@ -3,6 +3,7 @@ import { HttpModule } from '@nestjs/axios';
 
 import { Erc721SalesService } from './erc721sales.service';
 // import { PhunksBidService } from './extensions/phunks.bid.extension.service';
+// import { PhunksAuctionHouseService } from './extensions/phunks.auction.house.extension.service';
 
 @Module({
   imports: [HttpModule],
@@ -15,6 +16,7 @@ import { Erc721SalesService } from './erc721sales.service';
     ////
     //
     // PhunksBidService,
+    // PhunksAuctionHouseService
   ],
 })
 
