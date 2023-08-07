@@ -1,0 +1,1605 @@
+[
+    {
+        "inputs": [
+            {
+                "components": [
+                    {
+                        "internalType": "address",
+                        "name": "treasuryWalletAddress",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "addressToSendBoughtPhunksTo",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "phunkContractAddress",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "wethContractAddress",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "chainlinkTokenAddress",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "appraisalOracleAddress",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "phunkERC20Address",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "sushiSwapPhunkERC20WethPoolAddress",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "priceAppraisalSignerAddress",
+                        "type": "address"
+                    }
+                ],
+                "internalType": "struct PhunkAuctionFlywheel.AddressRegistry",
+                "name": "_addressRegistry",
+                "type": "tuple"
+            },
+            {
+                "components": [
+                    {
+                        "internalType": "uint256",
+                        "name": "costOfOracleInJuels",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "bytes32",
+                        "name": "priceEstimationJobId",
+                        "type": "bytes32"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "minPctOfNFTxSpotPriceToPay",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "minAmountOfPhunkInSushiPoolForValidSpotPrice",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "pctOfOraclePriceEstimateToPay",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "enum PhunkAuctionFlywheel.ContractStatus",
+                        "name": "status",
+                        "type": "uint8"
+                    }
+                ],
+                "internalType": "struct PhunkAuctionFlywheel.ContractConfig",
+                "name": "_contractConfig",
+                "type": "tuple"
+            }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "constructor"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "components": [
+                    {
+                        "internalType": "address",
+                        "name": "treasuryWalletAddress",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "addressToSendBoughtPhunksTo",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "phunkContractAddress",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "wethContractAddress",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "chainlinkTokenAddress",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "appraisalOracleAddress",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "phunkERC20Address",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "sushiSwapPhunkERC20WethPoolAddress",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "priceAppraisalSignerAddress",
+                        "type": "address"
+                    }
+                ],
+                "indexed": false,
+                "internalType": "struct PhunkAuctionFlywheel.AddressRegistry",
+                "name": "newRegistry",
+                "type": "tuple"
+            }
+        ],
+        "name": "AddressRegistryUpdated",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "bytes32",
+                "name": "id",
+                "type": "bytes32"
+            }
+        ],
+        "name": "ChainlinkCancelled",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "bytes32",
+                "name": "id",
+                "type": "bytes32"
+            }
+        ],
+        "name": "ChainlinkFulfilled",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "bytes32",
+                "name": "id",
+                "type": "bytes32"
+            }
+        ],
+        "name": "ChainlinkRequested",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "components": [
+                    {
+                        "internalType": "uint256",
+                        "name": "costOfOracleInJuels",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "bytes32",
+                        "name": "priceEstimationJobId",
+                        "type": "bytes32"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "minPctOfNFTxSpotPriceToPay",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "minAmountOfPhunkInSushiPoolForValidSpotPrice",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "pctOfOraclePriceEstimateToPay",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "enum PhunkAuctionFlywheel.ContractStatus",
+                        "name": "status",
+                        "type": "uint8"
+                    }
+                ],
+                "indexed": false,
+                "internalType": "struct PhunkAuctionFlywheel.ContractConfig",
+                "name": "newConfig",
+                "type": "tuple"
+            }
+        ],
+        "name": "ContractConfigUpdated",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": false,
+                "internalType": "uint256[]",
+                "name": "weekStarts",
+                "type": "uint256[]"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256[]",
+                "name": "weeklyLimits",
+                "type": "uint256[]"
+            }
+        ],
+        "name": "EthDeposited",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": false,
+                "internalType": "uint256[]",
+                "name": "weekStarts",
+                "type": "uint256[]"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256[]",
+                "name": "amounts",
+                "type": "uint256[]"
+            }
+        ],
+        "name": "EthWithdrawn",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "amount",
+                "type": "uint256"
+            }
+        ],
+        "name": "FailsafeWithdrawal",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "components": [
+                    {
+                        "internalType": "enum PhunkAuctionFlywheel.OfferStatus",
+                        "name": "status",
+                        "type": "uint8"
+                    },
+                    {
+                        "internalType": "enum PhunkAuctionFlywheel.OfferCancellationReason",
+                        "name": "cancellationReason",
+                        "type": "uint8"
+                    },
+                    {
+                        "internalType": "uint16",
+                        "name": "phunkId",
+                        "type": "uint16"
+                    },
+                    {
+                        "internalType": "uint64",
+                        "name": "offerValidUntil",
+                        "type": "uint64"
+                    },
+                    {
+                        "internalType": "bool",
+                        "name": "enoughPhunkInSushiPoolForValidSpotPrice",
+                        "type": "bool"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "seller",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "minSalePrice",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "oraclePriceEstimate",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "bytes32",
+                        "name": "appraisalRequestId",
+                        "type": "bytes32"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "minAppraisalConsideredValid",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "priceFlywheelIsWillingToPay",
+                        "type": "uint256"
+                    }
+                ],
+                "indexed": false,
+                "internalType": "struct PhunkAuctionFlywheel.Offer",
+                "name": "offer",
+                "type": "tuple"
+            },
+            {
+                "indexed": true,
+                "internalType": "uint256",
+                "name": "phunkId",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "minSalePrice",
+                "type": "uint256"
+            },
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "seller",
+                "type": "address"
+            }
+        ],
+        "name": "PhunkOfferedForSale",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "components": [
+                    {
+                        "internalType": "enum PhunkAuctionFlywheel.OfferStatus",
+                        "name": "status",
+                        "type": "uint8"
+                    },
+                    {
+                        "internalType": "enum PhunkAuctionFlywheel.OfferCancellationReason",
+                        "name": "cancellationReason",
+                        "type": "uint8"
+                    },
+                    {
+                        "internalType": "uint16",
+                        "name": "phunkId",
+                        "type": "uint16"
+                    },
+                    {
+                        "internalType": "uint64",
+                        "name": "offerValidUntil",
+                        "type": "uint64"
+                    },
+                    {
+                        "internalType": "bool",
+                        "name": "enoughPhunkInSushiPoolForValidSpotPrice",
+                        "type": "bool"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "seller",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "minSalePrice",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "oraclePriceEstimate",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "bytes32",
+                        "name": "appraisalRequestId",
+                        "type": "bytes32"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "minAppraisalConsideredValid",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "priceFlywheelIsWillingToPay",
+                        "type": "uint256"
+                    }
+                ],
+                "indexed": false,
+                "internalType": "struct PhunkAuctionFlywheel.Offer",
+                "name": "offer",
+                "type": "tuple"
+            },
+            {
+                "indexed": true,
+                "internalType": "uint256",
+                "name": "phunkId",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "minSalePrice",
+                "type": "uint256"
+            },
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "seller",
+                "type": "address"
+            }
+        ],
+        "name": "PhunkSoldViaSignature",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "components": [
+                    {
+                        "internalType": "enum PhunkAuctionFlywheel.OfferStatus",
+                        "name": "status",
+                        "type": "uint8"
+                    },
+                    {
+                        "internalType": "enum PhunkAuctionFlywheel.OfferCancellationReason",
+                        "name": "cancellationReason",
+                        "type": "uint8"
+                    },
+                    {
+                        "internalType": "uint16",
+                        "name": "phunkId",
+                        "type": "uint16"
+                    },
+                    {
+                        "internalType": "uint64",
+                        "name": "offerValidUntil",
+                        "type": "uint64"
+                    },
+                    {
+                        "internalType": "bool",
+                        "name": "enoughPhunkInSushiPoolForValidSpotPrice",
+                        "type": "bool"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "seller",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "minSalePrice",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "oraclePriceEstimate",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "bytes32",
+                        "name": "appraisalRequestId",
+                        "type": "bytes32"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "minAppraisalConsideredValid",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "priceFlywheelIsWillingToPay",
+                        "type": "uint256"
+                    }
+                ],
+                "indexed": false,
+                "internalType": "struct PhunkAuctionFlywheel.Offer",
+                "name": "offer",
+                "type": "tuple"
+            },
+            {
+                "indexed": true,
+                "internalType": "bytes32",
+                "name": "requestId",
+                "type": "bytes32"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "priceToPay",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "minAppraisalConsideredValid",
+                "type": "uint256"
+            }
+        ],
+        "name": "PriceEstimateCancelled",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "components": [
+                    {
+                        "internalType": "enum PhunkAuctionFlywheel.OfferStatus",
+                        "name": "status",
+                        "type": "uint8"
+                    },
+                    {
+                        "internalType": "enum PhunkAuctionFlywheel.OfferCancellationReason",
+                        "name": "cancellationReason",
+                        "type": "uint8"
+                    },
+                    {
+                        "internalType": "uint16",
+                        "name": "phunkId",
+                        "type": "uint16"
+                    },
+                    {
+                        "internalType": "uint64",
+                        "name": "offerValidUntil",
+                        "type": "uint64"
+                    },
+                    {
+                        "internalType": "bool",
+                        "name": "enoughPhunkInSushiPoolForValidSpotPrice",
+                        "type": "bool"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "seller",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "minSalePrice",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "oraclePriceEstimate",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "bytes32",
+                        "name": "appraisalRequestId",
+                        "type": "bytes32"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "minAppraisalConsideredValid",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "priceFlywheelIsWillingToPay",
+                        "type": "uint256"
+                    }
+                ],
+                "indexed": false,
+                "internalType": "struct PhunkAuctionFlywheel.Offer",
+                "name": "offer",
+                "type": "tuple"
+            },
+            {
+                "indexed": true,
+                "internalType": "bytes32",
+                "name": "requestId",
+                "type": "bytes32"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "priceToPay",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "minAppraisalConsideredValid",
+                "type": "uint256"
+            }
+        ],
+        "name": "PriceEstimateFulfilled",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "uint256",
+                "name": "phunkId",
+                "type": "uint256"
+            },
+            {
+                "indexed": true,
+                "internalType": "bytes32",
+                "name": "requestId",
+                "type": "bytes32"
+            }
+        ],
+        "name": "PriceEstimateRequested",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "bytes32",
+                "name": "role",
+                "type": "bytes32"
+            },
+            {
+                "indexed": true,
+                "internalType": "bytes32",
+                "name": "previousAdminRole",
+                "type": "bytes32"
+            },
+            {
+                "indexed": true,
+                "internalType": "bytes32",
+                "name": "newAdminRole",
+                "type": "bytes32"
+            }
+        ],
+        "name": "RoleAdminChanged",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "bytes32",
+                "name": "role",
+                "type": "bytes32"
+            },
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "account",
+                "type": "address"
+            },
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "sender",
+                "type": "address"
+            }
+        ],
+        "name": "RoleGranted",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "bytes32",
+                "name": "role",
+                "type": "bytes32"
+            },
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "account",
+                "type": "address"
+            },
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "sender",
+                "type": "address"
+            }
+        ],
+        "name": "RoleRevoked",
+        "type": "event"
+    },
+    {
+        "inputs": [],
+        "name": "DEFAULT_ADMIN_ROLE",
+        "outputs": [
+            {
+                "internalType": "bytes32",
+                "name": "",
+                "type": "bytes32"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "TESTER_ROLE",
+        "outputs": [
+            {
+                "internalType": "bytes32",
+                "name": "",
+                "type": "bytes32"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "addressRegistry",
+        "outputs": [
+            {
+                "internalType": "address",
+                "name": "treasuryWalletAddress",
+                "type": "address"
+            },
+            {
+                "internalType": "address",
+                "name": "addressToSendBoughtPhunksTo",
+                "type": "address"
+            },
+            {
+                "internalType": "address",
+                "name": "phunkContractAddress",
+                "type": "address"
+            },
+            {
+                "internalType": "address",
+                "name": "wethContractAddress",
+                "type": "address"
+            },
+            {
+                "internalType": "address",
+                "name": "chainlinkTokenAddress",
+                "type": "address"
+            },
+            {
+                "internalType": "address",
+                "name": "appraisalOracleAddress",
+                "type": "address"
+            },
+            {
+                "internalType": "address",
+                "name": "phunkERC20Address",
+                "type": "address"
+            },
+            {
+                "internalType": "address",
+                "name": "sushiSwapPhunkERC20WethPoolAddress",
+                "type": "address"
+            },
+            {
+                "internalType": "address",
+                "name": "priceAppraisalSignerAddress",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "bytes32",
+                "name": "requestId",
+                "type": "bytes32"
+            },
+            {
+                "internalType": "uint256",
+                "name": "estimate",
+                "type": "uint256"
+            }
+        ],
+        "name": "buyPhunkUsingOracleAppraisal",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "contractConfig",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "costOfOracleInJuels",
+                "type": "uint256"
+            },
+            {
+                "internalType": "bytes32",
+                "name": "priceEstimationJobId",
+                "type": "bytes32"
+            },
+            {
+                "internalType": "uint256",
+                "name": "minPctOfNFTxSpotPriceToPay",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "minAmountOfPhunkInSushiPoolForValidSpotPrice",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "pctOfOraclePriceEstimateToPay",
+                "type": "uint256"
+            },
+            {
+                "internalType": "enum PhunkAuctionFlywheel.ContractStatus",
+                "name": "status",
+                "type": "uint8"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint256[]",
+                "name": "weekStarts",
+                "type": "uint256[]"
+            },
+            {
+                "internalType": "uint256[]",
+                "name": "weeklyLimits",
+                "type": "uint256[]"
+            }
+        ],
+        "name": "depositEthWithWeeklySpendingLimits",
+        "outputs": [],
+        "stateMutability": "payable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint256",
+                "name": "amount",
+                "type": "uint256"
+            }
+        ],
+        "name": "failsafeWithdraw",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "getCurrentMinimumValidPrice",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            },
+            {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint256",
+                "name": "limit",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "offset",
+                "type": "uint256"
+            }
+        ],
+        "name": "getOffers",
+        "outputs": [
+            {
+                "components": [
+                    {
+                        "internalType": "enum PhunkAuctionFlywheel.OfferStatus",
+                        "name": "status",
+                        "type": "uint8"
+                    },
+                    {
+                        "internalType": "enum PhunkAuctionFlywheel.OfferCancellationReason",
+                        "name": "cancellationReason",
+                        "type": "uint8"
+                    },
+                    {
+                        "internalType": "uint16",
+                        "name": "phunkId",
+                        "type": "uint16"
+                    },
+                    {
+                        "internalType": "uint64",
+                        "name": "offerValidUntil",
+                        "type": "uint64"
+                    },
+                    {
+                        "internalType": "bool",
+                        "name": "enoughPhunkInSushiPoolForValidSpotPrice",
+                        "type": "bool"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "seller",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "minSalePrice",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "oraclePriceEstimate",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "bytes32",
+                        "name": "appraisalRequestId",
+                        "type": "bytes32"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "minAppraisalConsideredValid",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "priceFlywheelIsWillingToPay",
+                        "type": "uint256"
+                    }
+                ],
+                "internalType": "struct PhunkAuctionFlywheel.Offer[]",
+                "name": "",
+                "type": "tuple[]"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "getPhunkERC20BalanceInSushiPool",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "bytes32",
+                "name": "role",
+                "type": "bytes32"
+            }
+        ],
+        "name": "getRoleAdmin",
+        "outputs": [
+            {
+                "internalType": "bytes32",
+                "name": "",
+                "type": "bytes32"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "getStartOfCurrentWeek",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint256",
+                "name": "currentTime",
+                "type": "uint256"
+            }
+        ],
+        "name": "getStartOfWeek",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "pure",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "getWethBalanceInSushiPool",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address[]",
+                "name": "users",
+                "type": "address[]"
+            }
+        ],
+        "name": "grantAdminRole",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "bytes32",
+                "name": "role",
+                "type": "bytes32"
+            },
+            {
+                "internalType": "address",
+                "name": "account",
+                "type": "address"
+            }
+        ],
+        "name": "grantRole",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address[]",
+                "name": "users",
+                "type": "address[]"
+            }
+        ],
+        "name": "grantTesterRole",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "bytes32",
+                "name": "role",
+                "type": "bytes32"
+            },
+            {
+                "internalType": "address",
+                "name": "account",
+                "type": "address"
+            }
+        ],
+        "name": "hasRole",
+        "outputs": [
+            {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "hwonderAddress",
+        "outputs": [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "middleAddress",
+        "outputs": [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "name": "offers",
+        "outputs": [
+            {
+                "internalType": "enum PhunkAuctionFlywheel.OfferStatus",
+                "name": "status",
+                "type": "uint8"
+            },
+            {
+                "internalType": "enum PhunkAuctionFlywheel.OfferCancellationReason",
+                "name": "cancellationReason",
+                "type": "uint8"
+            },
+            {
+                "internalType": "uint16",
+                "name": "phunkId",
+                "type": "uint16"
+            },
+            {
+                "internalType": "uint64",
+                "name": "offerValidUntil",
+                "type": "uint64"
+            },
+            {
+                "internalType": "bool",
+                "name": "enoughPhunkInSushiPoolForValidSpotPrice",
+                "type": "bool"
+            },
+            {
+                "internalType": "address",
+                "name": "seller",
+                "type": "address"
+            },
+            {
+                "internalType": "uint256",
+                "name": "minSalePrice",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "oraclePriceEstimate",
+                "type": "uint256"
+            },
+            {
+                "internalType": "bytes32",
+                "name": "appraisalRequestId",
+                "type": "bytes32"
+            },
+            {
+                "internalType": "uint256",
+                "name": "minAppraisalConsideredValid",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "priceFlywheelIsWillingToPay",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "bytes32",
+                "name": "",
+                "type": "bytes32"
+            }
+        ],
+        "name": "priceRequestIdToOffer",
+        "outputs": [
+            {
+                "internalType": "enum PhunkAuctionFlywheel.OfferStatus",
+                "name": "status",
+                "type": "uint8"
+            },
+            {
+                "internalType": "enum PhunkAuctionFlywheel.OfferCancellationReason",
+                "name": "cancellationReason",
+                "type": "uint8"
+            },
+            {
+                "internalType": "uint16",
+                "name": "phunkId",
+                "type": "uint16"
+            },
+            {
+                "internalType": "uint64",
+                "name": "offerValidUntil",
+                "type": "uint64"
+            },
+            {
+                "internalType": "bool",
+                "name": "enoughPhunkInSushiPoolForValidSpotPrice",
+                "type": "bool"
+            },
+            {
+                "internalType": "address",
+                "name": "seller",
+                "type": "address"
+            },
+            {
+                "internalType": "uint256",
+                "name": "minSalePrice",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "oraclePriceEstimate",
+                "type": "uint256"
+            },
+            {
+                "internalType": "bytes32",
+                "name": "appraisalRequestId",
+                "type": "bytes32"
+            },
+            {
+                "internalType": "uint256",
+                "name": "minAppraisalConsideredValid",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "priceFlywheelIsWillingToPay",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "bytes32",
+                "name": "role",
+                "type": "bytes32"
+            },
+            {
+                "internalType": "address",
+                "name": "account",
+                "type": "address"
+            }
+        ],
+        "name": "renounceRole",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address[]",
+                "name": "users",
+                "type": "address[]"
+            }
+        ],
+        "name": "revokeAdminRole",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "bytes32",
+                "name": "role",
+                "type": "bytes32"
+            },
+            {
+                "internalType": "address",
+                "name": "account",
+                "type": "address"
+            }
+        ],
+        "name": "revokeRole",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address[]",
+                "name": "users",
+                "type": "address[]"
+            }
+        ],
+        "name": "revokeTesterRole",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "bytes",
+                "name": "signature",
+                "type": "bytes"
+            },
+            {
+                "internalType": "uint16",
+                "name": "phunkId",
+                "type": "uint16"
+            },
+            {
+                "internalType": "uint256",
+                "name": "phunkPrice",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint256",
+                "name": "offerValidUntil",
+                "type": "uint256"
+            }
+        ],
+        "name": "sellPhunkWithSignature",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "components": [
+                    {
+                        "internalType": "address",
+                        "name": "treasuryWalletAddress",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "addressToSendBoughtPhunksTo",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "phunkContractAddress",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "wethContractAddress",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "chainlinkTokenAddress",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "appraisalOracleAddress",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "phunkERC20Address",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "sushiSwapPhunkERC20WethPoolAddress",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "priceAppraisalSignerAddress",
+                        "type": "address"
+                    }
+                ],
+                "internalType": "struct PhunkAuctionFlywheel.AddressRegistry",
+                "name": "_addressRegistry",
+                "type": "tuple"
+            }
+        ],
+        "name": "setAddressRegistry",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "components": [
+                    {
+                        "internalType": "uint256",
+                        "name": "costOfOracleInJuels",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "bytes32",
+                        "name": "priceEstimationJobId",
+                        "type": "bytes32"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "minPctOfNFTxSpotPriceToPay",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "minAmountOfPhunkInSushiPoolForValidSpotPrice",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "pctOfOraclePriceEstimateToPay",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "enum PhunkAuctionFlywheel.ContractStatus",
+                        "name": "status",
+                        "type": "uint8"
+                    }
+                ],
+                "internalType": "struct PhunkAuctionFlywheel.ContractConfig",
+                "name": "_contractConfig",
+                "type": "tuple"
+            }
+        ],
+        "name": "setContractConfig",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "name": "startOfWeekToWeeklyAllowanceMapping",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "bytes4",
+                "name": "interfaceId",
+                "type": "bytes4"
+            }
+        ],
+        "name": "supportsInterface",
+        "outputs": [
+            {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint256",
+                "name": "timestamp",
+                "type": "uint256"
+            }
+        ],
+        "name": "timestampIsAStartOfWeek",
+        "outputs": [
+            {
+                "internalType": "bool",
+                "name": "",
+                "type": "bool"
+            }
+        ],
+        "stateMutability": "pure",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint16",
+                "name": "phunkId",
+                "type": "uint16"
+            },
+            {
+                "internalType": "uint256",
+                "name": "minSalePrice",
+                "type": "uint256"
+            },
+            {
+                "internalType": "uint64",
+                "name": "offerValidDuration",
+                "type": "uint64"
+            }
+        ],
+        "name": "tryToSellPhunkWithOracle",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint256[]",
+                "name": "weekStarts",
+                "type": "uint256[]"
+            },
+            {
+                "internalType": "uint256[]",
+                "name": "amounts",
+                "type": "uint256[]"
+            }
+        ],
+        "name": "withdrawEthFromWeeklySpendingLimits",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    }
+]
