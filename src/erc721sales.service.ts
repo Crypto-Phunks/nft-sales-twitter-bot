@@ -24,7 +24,9 @@ const looksRareContractAddress = '0x59728544b08ab483533076417fbbb2fd0b17ce3a'; /
 const looksRareContractAddressV2 = '0x0000000000e655fae4d56241588680f86e3b2377'; // Don't change unless deprecated
 
 const blurContractAddress = '0x000000000000ad05ccc4f10045630fb830b95127';
-const blurSalesContractAddress = '0xb2ecfe4e4d61f8790bbb9de2d1259b9e2410cea5';
+const blurMarketplaceAddress = '0x39da41747a83aeE658334415666f3EF92DD0D541';
+const blurSalesContractAddressV3 = '0xb2ecfe4e4d61f8790bbb9de2d1259b9e2410cea5';
+const blurSalesContractAddressV2 = '0x39da41747a83aeE658334415666f3EF92DD0D541';
 const blurBiddingContractAddress = '0x0000000000a39bb272e79075ade125fd351887ac';
 
 const looksInterface = new ethers.utils.Interface(looksRareABI);
@@ -206,7 +208,8 @@ export class Erc721SalesService extends BaseService {
         .filter(l => l.address.toLowerCase() === blurBiddingContractAddress.toLowerCase())
         .filter(l => {
           // find payment to blur
-          return ethers.utils.defaultAbiCoder.decode(['address'], l?.topics[2])[0].toLowerCase() === blurSalesContractAddress.toLowerCase()
+          const address = ethers.utils.defaultAbiCoder.decode(['address'], l?.topics[2])[0].toLowerCase()
+          return address === blurSalesContractAddressV3.toLowerCase() || address === blurSalesContractAddressV2.toLowerCase()
         })
         .map(l => {
           const relevantData = l.data.substring(2);
@@ -219,10 +222,15 @@ export class Erc721SalesService extends BaseService {
 
           return amount/BigInt(count)
         })
+
       
-        // if that's not a sales but use blur contract address, it's a sweep
-        const BLUR_IO_SWEEP = BLUR_IO_SALES.length || transaction.to.toLowerCase() != blurSalesContractAddress ? [] :
-          receipt.logs.filter(l => l.address.toLowerCase() === blurSalesContractAddress.toLowerCase())
+      // if that's not a sales but use blur contract address, it's a sweep
+      const BLUR_IO_SWEEP = BLUR_IO_SALES.length || 
+        (transaction.to.toLowerCase() != blurSalesContractAddressV3.toLowerCase() && 
+        transaction.to.toLowerCase() != blurSalesContractAddressV2.toLowerCase() && 
+        transaction.to.toLowerCase() != blurMarketplaceAddress.toLowerCase()) ? [] :
+        receipt.logs.filter(l => l.address.toLowerCase() === blurSalesContractAddressV3.toLowerCase() ||
+          l.address.toLowerCase() === blurSalesContractAddressV2.toLowerCase())
       
       const OPENSEA_SEAPORT = receipt.logs.map((log: any) => {
         if (log.topics[0].toLowerCase() === '0x9d9af8e38d66c62e2c12f0225249fd9d721c54b83f48d9352c97c6cacdcb6f31') {
@@ -276,7 +284,14 @@ export class Erc721SalesService extends BaseService {
         const value = ethers.utils.formatEther(weiValue/BigInt(BLUR_IO_SALES.length));
         alternateValue = parseFloat(value);
       } else if (BLUR_IO_SWEEP.length) {
-        alternateValue = parseFloat(ether)/BLUR_IO_SWEEP.length
+        // if we're here, we weren't able to get the exact price, determinate it 
+        // using the overall price and the ether spent in tx
+        // the only way to get an accurate result would be to run an EVM to track
+        // internal txs
+        const count = receipt.logs
+          .filter(l => l.address.toLowerCase() === '0xf07468ead8cf26c752c676e43c814fee9c8cf402' && 
+          l.topics[0] === '0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925').length
+        alternateValue = parseFloat(ether)/count
       }
 
       // if there is an NFTX swap involved, ignore this transfer
