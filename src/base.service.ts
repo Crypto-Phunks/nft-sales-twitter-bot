@@ -59,7 +59,10 @@ export class BaseService {
     protected readonly http: HttpService
   ) {
 
-    this.getEthToFiat().subscribe((fiat) => this.fiatValues = fiat.ethereum);
+    this.getEthToFiat().subscribe((fiat) => {
+      if (fiat.length)
+        this.fiatValues = fiat.ethereum
+    });
   }
 
   getWeb3Provider() {
@@ -99,7 +102,7 @@ export class BaseService {
                             data.type === TweetType.FLYWHEEL_SOLD ? config.flywheelMessage : config.auctionMessage;;
 
     // Cash value
-    const fiatValue = this.fiatValues[config.currency] * (data.alternateValue ? data.alternateValue : data.ether);
+    const fiatValue = this.fiatValues.length ? this.fiatValues[config.currency] * (data.alternateValue ?? data.ether) : undefined;
     const fiat = currency(fiatValue, { symbol: fiatSymbols[config.currency].symbol, precision: 0 });
 
     const ethValue = data.alternateValue ? data.alternateValue : data.ether;
@@ -111,7 +114,7 @@ export class BaseService {
     tweetText = tweetText.replace(new RegExp('<txHash>', 'g'), data.transactionHash);
     tweetText = tweetText.replace(new RegExp('<from>', 'g'), data.from);
     tweetText = tweetText.replace(new RegExp('<to>', 'g'), data.to);
-    tweetText = tweetText.replace(new RegExp('<fiatPrice>', 'g'), fiat.format());
+    tweetText = tweetText.replace(new RegExp('<fiatPrice>', 'g'), fiat ? fiat.format() : '???');
     tweetText = tweetText.replace(new RegExp('<additionalText>', 'g'), data.additionalText);
 
     // Format our image to base64
@@ -173,7 +176,7 @@ export class BaseService {
       map((res: any) => res.data),
       // tap((res) => console.log(res)),
       catchError((err: any) => {
-        console.log(err);
+        console.warn('coin gecko call failed, ignoring fiat price', err.toString());
         return of({});
       })
     );
