@@ -103,7 +103,7 @@ export class BaseService {
 
     // Cash value
     const fiatValue = this.fiatValues && Object.values(this.fiatValues).length ? this.fiatValues[config.currency] * (data.alternateValue ?? data.ether) : undefined;
-    const fiat = currency(fiatValue, { symbol: fiatSymbols[config.currency].symbol, precision: 0 });
+    const fiat = fiatValue != null ? currency(fiatValue, { symbol: fiatSymbols[config.currency].symbol, precision: 0 }) : undefined;
 
     const ethValue = data.alternateValue ? data.alternateValue : data.ether;
     const eth = currency(ethValue, { symbol: 'Ξ', precision: 3 });
