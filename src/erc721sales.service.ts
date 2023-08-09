@@ -212,8 +212,17 @@ export class Erc721SalesService extends BaseService {
           const relevantData = l.data.substring(2);
           const relevantDataSlice = relevantData.match(/.{1,64}/g);
           const amount = BigInt(`0x${relevantDataSlice[0]}`)
-          return amount
+
+          // we also need to find the number of token bought in this transaction to adjust the price
+          const count = receipt.logs
+            .filter(l => l.address.toLowerCase() === blurBiddingContractAddress.toLowerCase()).length
+
+          return amount/BigInt(count)
         })
+      
+        // if that's not a sales but use blur contract address, it's a sweep
+        const BLUR_IO_SWEEP = BLUR_IO_SALES.length || transaction.to.toLowerCase() != blurSalesContractAddress ? [] :
+          receipt.logs.filter(l => l.address.toLowerCase() === blurSalesContractAddress.toLowerCase())
       
       const OPENSEA_SEAPORT = receipt.logs.map((log: any) => {
         if (log.topics[0].toLowerCase() === '0x9d9af8e38d66c62e2c12f0225249fd9d721c54b83f48d9352c97c6cacdcb6f31') {
@@ -266,6 +275,8 @@ export class Erc721SalesService extends BaseService {
         const weiValue = BLUR_IO_SALES.reduce((previous,current) => previous + current, BigInt(0));
         const value = ethers.utils.formatEther(weiValue/BigInt(BLUR_IO_SALES.length));
         alternateValue = parseFloat(value);
+      } else if (BLUR_IO_SWEEP.length) {
+        alternateValue = parseFloat(ether)/BLUR_IO_SWEEP.length
       }
 
       // if there is an NFTX swap involved, ignore this transfer
