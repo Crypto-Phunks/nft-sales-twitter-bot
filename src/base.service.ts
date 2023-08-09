@@ -60,7 +60,7 @@ export class BaseService {
   ) {
 
     this.getEthToFiat().subscribe((fiat) => {
-      if (fiat.length)
+      if (fiat !== undefined)
         this.fiatValues = fiat.ethereum
     });
   }
@@ -102,7 +102,7 @@ export class BaseService {
                             data.type === TweetType.FLYWHEEL_SOLD ? config.flywheelMessage : config.auctionMessage;;
 
     // Cash value
-    const fiatValue = this.fiatValues && this.fiatValues.length ? this.fiatValues[config.currency] * (data.alternateValue ?? data.ether) : undefined;
+    const fiatValue = this.fiatValues && Object.values(this.fiatValues).length ? this.fiatValues[config.currency] * (data.alternateValue ?? data.ether) : undefined;
     const fiat = currency(fiatValue, { symbol: fiatSymbols[config.currency].symbol, precision: 0 });
 
     const ethValue = data.alternateValue ? data.alternateValue : data.ether;
@@ -177,7 +177,7 @@ export class BaseService {
       // tap((res) => console.log(res)),
       catchError((err: any) => {
         console.warn('coin gecko call failed, ignoring fiat price', err.toString());
-        return of({});
+        return of(undefined);
       })
     );
   }
