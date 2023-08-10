@@ -60,7 +60,7 @@ export class BaseService {
   ) {
 
     this.getEthToFiat().subscribe((fiat) => {
-      if (fiat !== undefined)
+      if (fiat && fiat.ethereum && Object.values(fiat.ethereum).length)
         this.fiatValues = fiat.ethereum
     });
   }
