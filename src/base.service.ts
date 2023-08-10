@@ -102,7 +102,8 @@ export class BaseService {
                             data.type === TweetType.FLYWHEEL_SOLD ? config.flywheelMessage : config.auctionMessage;;
 
     // Cash value
-    const fiatValue = this.fiatValues && Object.values(this.fiatValues).length ? this.fiatValues[config.currency] * (data.alternateValue ?? data.ether) : undefined;
+    const value = data.alternateValue && data.alternateValue > 0 ? data.alternateValue : data.ether
+    const fiatValue = this.fiatValues && Object.values(this.fiatValues).length ? this.fiatValues[config.currency] * value : undefined;
     const fiat = fiatValue != null ? currency(fiatValue, { symbol: fiatSymbols[config.currency].symbol, precision: 0 }) : undefined;
 
     const ethValue = data.alternateValue ? data.alternateValue : data.ether;

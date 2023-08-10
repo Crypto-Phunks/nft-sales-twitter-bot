@@ -216,11 +216,7 @@ export class Erc721SalesService extends BaseService {
           const relevantDataSlice = relevantData.match(/.{1,64}/g);
           const amount = BigInt(`0x${relevantDataSlice[0]}`)
 
-          // we also need to find the number of token bought in this transaction to adjust the price
-          const count = receipt.logs
-            .filter(l => l.address.toLowerCase() === blurBiddingContractAddress.toLowerCase()).length
-
-          return amount/BigInt(count)
+          return amount
         })
 
       
