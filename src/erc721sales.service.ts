@@ -49,6 +49,10 @@ export class Erc721SalesService extends BaseService {
     protected readonly http: HttpService
   ) {
     super(http)
+  }
+  
+  startProvider() {
+
     // Listen for Transfer event
     this.provider.on({ address: config.contract_address, topics: [topics] }, (event) => {
       this.getTransactionDetails(event).then((res) => {
@@ -203,7 +207,7 @@ export class Erc721SalesService extends BaseService {
           return blurInterface.parseLog(log);
         }
       }).filter(l => l?.name === 'OrdersMatched' && l?.args.buy.tokenId.toString() === tokenId)
-      
+
       const BLUR_IO_SALES = receipt.logs
         .filter(l => l.address.toLowerCase() === blurBiddingContractAddress.toLowerCase())
         .filter(l => {
@@ -235,6 +239,7 @@ export class Erc721SalesService extends BaseService {
             o => o.identifier.toString() === tokenId || 
             o.identifier.toString() === '0');
           const tokenCount = logDescription.args.offer.length;
+          
           if (matchingOffers.length === 0) {
             return
           }
@@ -285,8 +290,7 @@ export class Erc721SalesService extends BaseService {
         // the only way to get an accurate result would be to run an EVM to track
         // internal txs
         const count = receipt.logs
-          .filter(l => l.address.toLowerCase() === '0xf07468ead8cf26c752c676e43c814fee9c8cf402' && 
-          l.topics[0] === '0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925').length
+          .filter(l => l.topics[0] === '0x7dc5c0699ac8dd5250cbe368a2fc3b4a2daadb120ad07f6cccea29f83482686e').length
         alternateValue = parseFloat(ether)/count
       }
 

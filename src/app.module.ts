@@ -22,4 +22,9 @@ import { PhunksAuctionFlywheelService } from './extensions/phunks.auction.flywhe
   ],
 })
 
-export class AppModule {}
+export class AppModule {
+
+  constructor(private saleService:Erc721SalesService) {
+    this.saleService.startProvider()
+  }
+}

@@ -22,14 +22,14 @@ export const alchemyAPIKey = process.env.ALCHEMY_API_KEY;
 
 const tokenContractAddress = config.contract_address;
 
-const provider = new ethers.providers.JsonRpcProvider(alchemyAPIUrl + alchemyAPIKey);
+const provider = ethers.getDefaultProvider(alchemyAPIUrl + alchemyAPIKey);
 
-const v2Client = new TwitterApi({
+const v2Client = process.env.hasOwnProperty('TWITTER_ACCESS_TOKEN_KEY') ? new TwitterApi({
   accessToken: process.env.TWITTER_ACCESS_TOKEN_KEY,
   accessSecret: process.env.TWITTER_ACCESS_TOKEN_SECRET,
   appKey: process.env.TWITTER_API_KEY,
   appSecret: process.env.TWITTER_API_KEY_SECRET,
-});
+}) : undefined;
 
 export enum TweetType {
   SALE,
