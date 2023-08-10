@@ -285,8 +285,7 @@ export class Erc721SalesService extends BaseService {
         // the only way to get an accurate result would be to run an EVM to track
         // internal txs
         const count = receipt.logs
-          .filter(l => l.address.toLowerCase() === '0xf07468ead8cf26c752c676e43c814fee9c8cf402' && 
-          l.topics[0] === '0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925').length
+          .filter(l => l.topics[0] === '0x7dc5c0699ac8dd5250cbe368a2fc3b4a2daadb120ad07f6cccea29f83482686e').length
         alternateValue = parseFloat(ether)/count
       }
 
