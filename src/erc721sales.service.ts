@@ -265,7 +265,10 @@ export class Erc721SalesService extends BaseService {
         alternateValue = parseFloat(value);
       } else if (BLUR_IO_SALES.length) {
         const weiValue = BLUR_IO_SALES.reduce((previous,current) => previous + current, BigInt(0));
-        const value = ethers.utils.formatEther(weiValue/BigInt(BLUR_IO_SALES.length));
+        const count = receipt.logs
+          .filter(l => l.address.toLowerCase() === config.contract_address.toLowerCase()).length
+        const value = ethers.utils.formatEther(weiValue/BigInt(count));
+
         alternateValue = parseFloat(value);
       } else if (BLUR_IO_SWEEP.length) {
         // if we're here, we weren't able to get the exact price, determinate it 
