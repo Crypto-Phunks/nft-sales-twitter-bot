@@ -18,7 +18,7 @@ import { PhunksAuctionFlywheelService } from './extensions/phunks.auction.flywhe
     //
     // PhunksBidService,
     // PhunksAuctionHouseService,
-    PhunksAuctionFlywheelService,
+    PhunksAuctionFlywheelService, 
   ],
 })
 

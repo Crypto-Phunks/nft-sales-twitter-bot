@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import fs from 'fs';
+import fiatSymbols from './fiat-symobols.json';
 import { EUploadMimeType, TwitterApi } from 'twitter-api-v2';
 
 import { ethers } from 'ethers';
@@ -15,7 +16,7 @@ dotenv.config();
 import looksRareABI from './abi/looksRareABI.json';
 
 import { config } from './config';
-import fiatSymbols from './fiat-symobols.json';
+import { Client, TextChannel } from 'discord.js';
 
 export const alchemyAPIUrl = 'https://eth-mainnet.alchemyapi.io/v2/';
 export const alchemyAPIKey = process.env.ALCHEMY_API_KEY;
@@ -55,6 +56,10 @@ export class BaseService {
   
   fiatValues: any;
 
+  client:Client;
+  channel: TextChannel;
+  discordSetup: boolean = false;
+
   constructor(
     protected readonly http: HttpService
   ) {
@@ -63,6 +68,17 @@ export class BaseService {
       if (fiat && fiat.ethereum && Object.values(fiat.ethereum).length)
         this.fiatValues = fiat.ethereum
     });
+
+
+    if (process.env.DISCORD_TOKEN) {
+      this.client = new Client({ intents: [] });
+      this.client.once('ready', async c => {
+          console.log(`Ready! Logged in as ${c.user.tag}`);
+          this.channel = await this.client.channels.fetch(config.discord_channel) as TextChannel
+      });
+      this.client.login(process.env.DISCORD_TOKEN);
+      this.discordSetup = true;
+    }    
   }
 
   getWeb3Provider() {
@@ -95,29 +111,31 @@ export class BaseService {
     );
   }
 
+  async dispatch(data: TweetRequest) {
+    const tweet = await this.tweet(data)
+    this.discord(data, tweet.id)
+  }
+
+  async discord(data: TweetRequest, tweetId:string) {
+    if (!this.discordSetup) return
+    
+    let template = config.saleMessageDiscord
+    template = template.replace(new RegExp('<tweetLink>', 'g'), `<https://twitter.com/i/web/status/${data.tokenId}>`);
+
+    const tweetText = this.formatText(data, config.saleMessageDiscord)
+    this.channel.send({
+        content: tweetText,
+        files: ['./auction_images/phunk1.png']
+    });
+}
   async tweet(data: TweetRequest) {
 
-    let tweetText: string = data.type === TweetType.SALE ? config.saleMessage : 
+    let template: string = data.type === TweetType.SALE ? config.saleMessage : 
                             data.type === TweetType.BID_ENTERED ? config.bidMessage : 
-                            data.type === TweetType.FLYWHEEL_SOLD ? config.flywheelMessage : config.auctionMessage;;
+                            data.type === TweetType.FLYWHEEL_SOLD ? config.flywheelMessage : config.auctionMessage;
 
-    // Cash value
-    const value = data.alternateValue && data.alternateValue > 0 ? data.alternateValue : data.ether
-    const fiatValue = this.fiatValues && Object.values(this.fiatValues).length ? this.fiatValues[config.currency] * value : undefined;
-    const fiat = fiatValue != null ? currency(fiatValue, { symbol: fiatSymbols[config.currency].symbol, precision: 0 }) : undefined;
-
-    const ethValue = data.alternateValue ? data.alternateValue : data.ether;
-    const eth = currency(ethValue, { symbol: 'Ξ', precision: 3 });
-
-    // Replace tokens from config file
-    tweetText = tweetText.replace(new RegExp('<tokenId>', 'g'), data.tokenId);
-    tweetText = tweetText.replace(new RegExp('<ethPrice>', 'g'), eth.format());
-    tweetText = tweetText.replace(new RegExp('<txHash>', 'g'), data.transactionHash);
-    tweetText = tweetText.replace(new RegExp('<from>', 'g'), data.from);
-    tweetText = tweetText.replace(new RegExp('<to>', 'g'), data.to);
-    tweetText = tweetText.replace(new RegExp('<fiatPrice>', 'g'), fiat ? fiat.format() : '???');
-    tweetText = tweetText.replace(new RegExp('<additionalText>', 'g'), data.additionalText);
-
+    const tweetText = this.formatText(data, template)
+    
     // Format our image to base64
     const image = config.use_local_images ? data.imageUrl : this.transformImage(data.imageUrl);
 
@@ -142,13 +160,35 @@ export class BaseService {
       console.log(
         `Successfully tweeted: ${createdTweet.id} -> ${createdTweet.text}`,
       );
-      return data;
+      return createdTweet;
     } else {
       console.error(errors);
       return null;
     }
   }
 
+  formatText(data: TweetRequest, template:string) {
+
+    // Cash value
+    const value = data.alternateValue && data.alternateValue > 0 ? data.alternateValue : data.ether
+    const fiatValue = this.fiatValues && Object.values(this.fiatValues).length ? this.fiatValues[config.currency] * value : undefined;
+    const fiat = fiatValue != null ? currency(fiatValue, { symbol: fiatSymbols[config.currency].symbol, precision: 0 }) : undefined;
+
+    const ethValue = data.alternateValue ? data.alternateValue : data.ether;
+    const eth = currency(ethValue, { symbol: 'Ξ', precision: 3 });
+
+    // Replace tokens from config file
+    template = template.replace(new RegExp('<tokenId>', 'g'), data.tokenId);
+    template = template.replace(new RegExp('<ethPrice>', 'g'), eth.format());
+    template = template.replace(new RegExp('<txHash>', 'g'), data.transactionHash);
+    template = template.replace(new RegExp('<from>', 'g'), data.from);
+    template = template.replace(new RegExp('<to>', 'g'), data.to);
+    template = template.replace(new RegExp('<fiatPrice>', 'g'), fiat ? fiat.format() : '???');
+    template = template.replace(new RegExp('<additionalText>', 'g'), data.additionalText);
+
+    return template
+  }
+  
   async getImageFile(url: string): Promise<Buffer | undefined> {
     return new Promise((resolve, _) => {
       if (url.startsWith('http')) {
@@ -197,3 +237,4 @@ export class BaseService {
   }
 
 }
+
