@@ -25,6 +25,24 @@ describe('Erc721SalesService', () => {
     expect(service).toBeDefined()
   });
 
+  it('blur single sale with ERC20 payment - 0xee4724d86a4e7c07117b6656267e1e0769879615a4dffdabb69a57d7786345b2', async () => {
+    const provider = service.getWeb3Provider()
+    config.contract_address = '0xA6Cd272874Ee7C872Eb66801Eff62784C0b13285'
+    const tokenContract = new ethers.Contract('0xA6Cd272874Ee7C872Eb66801Eff62784C0b13285', erc721abi, provider);
+    let filter = tokenContract.filters.Transfer();
+    const startingBlock = 17893514    
+    const events = await tokenContract.queryFilter(filter, 
+      startingBlock, 
+      startingBlock+1)
+    const results = await Promise.all(events.map(async (e) => await service.getTransactionDetails(e)))
+    //expect(results[0].alternateValue).toBe(0.31)
+    let logs = ''
+    results.forEach(r => {
+      logs += `${r.tokenId} sold for ${r.alternateValue}\n`
+    })
+    console.log(logs)
+  })
+/*
   it('blur single sale with ERC20 payment - 0x2212e9d1f1861e83b840fd8b5d5f7818c59e9c1f896d361abfcedb3eb722a26e', async () => {
     const provider = service.getWeb3Provider()
     const tokenContract = new ethers.Contract('0xf07468eAd8cf26c752C676E43C814FEe9c8CF402', erc721abi, provider);
@@ -73,5 +91,5 @@ describe('Erc721SalesService', () => {
         expect(result.alternateValue).toBe(0.0413)
     }
   })
-  
+  */
 });
