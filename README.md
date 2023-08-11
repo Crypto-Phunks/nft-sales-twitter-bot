@@ -1,6 +1,6 @@
 <h1>Twitter NFT sales bot</h1>
 
-![coverage](https://crypto-phunks.github.io/nft-sales-twitter-bot/coverage/badge-lines.svg)
+[![coverage](https://crypto-phunks.github.io/nft-sales-twitter-bot/badge-lines.svg)](https://crypto-phunks.github.io/nft-sales-twitter-bot/)
 
 ## Description
 
