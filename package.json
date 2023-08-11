@@ -71,6 +71,9 @@
     "collectCoverageFrom": [
       "**/*.(t|j)s"
     ],
+    "coveragePathIgnorePatterns": [
+        "src/extensions"
+    ],
     "coverageReporters": [
       "json-summary",
       "html",
