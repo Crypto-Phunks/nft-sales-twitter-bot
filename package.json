@@ -11,7 +11,9 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
-    "start:prod-with-watchdog": "concurrently npm:start:prod --restart-tries -1 --restart-after 5000"
+    "start:prod-with-watchdog": "concurrently npm:start:prod --restart-tries -1 --restart-after 5000",
+    "test": "jest --runInBand --detectOpenHandles --forceExit",
+    "test:watch": "jest --watch"
   },
   "dependencies": {
     "@nestjs/axios": "0.0.7",
@@ -68,7 +70,12 @@
     "collectCoverageFrom": [
       "**/*.(t|j)s"
     ],
+    "coverageReporters": [
+      "html",
+      "cobertura"
+    ],
+    "collectCoverage": true,
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "jsdom"
   }
 }

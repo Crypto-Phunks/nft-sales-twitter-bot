@@ -22,14 +22,14 @@ export const alchemyAPIKey = process.env.ALCHEMY_API_KEY;
 
 const tokenContractAddress = config.contract_address;
 
-const provider = new ethers.providers.JsonRpcProvider(alchemyAPIUrl + alchemyAPIKey);
+const provider = ethers.getDefaultProvider(alchemyAPIUrl + alchemyAPIKey);
 
-const v2Client = new TwitterApi({
+const v2Client = process.env.hasOwnProperty('TWITTER_ACCESS_TOKEN_KEY') ? new TwitterApi({
   accessToken: process.env.TWITTER_ACCESS_TOKEN_KEY,
   accessSecret: process.env.TWITTER_ACCESS_TOKEN_SECRET,
   appKey: process.env.TWITTER_API_KEY,
   appSecret: process.env.TWITTER_API_KEY_SECRET,
-});
+}) : undefined;
 
 export enum TweetType {
   SALE,
@@ -102,7 +102,8 @@ export class BaseService {
                             data.type === TweetType.FLYWHEEL_SOLD ? config.flywheelMessage : config.auctionMessage;;
 
     // Cash value
-    const fiatValue = this.fiatValues && Object.values(this.fiatValues).length ? this.fiatValues[config.currency] * (data.alternateValue ?? data.ether) : undefined;
+    const value = data.alternateValue && data.alternateValue > 0 ? data.alternateValue : data.ether
+    const fiatValue = this.fiatValues && Object.values(this.fiatValues).length ? this.fiatValues[config.currency] * value : undefined;
     const fiat = fiatValue != null ? currency(fiatValue, { symbol: fiatSymbols[config.currency].symbol, precision: 0 }) : undefined;
 
     const ethValue = data.alternateValue ? data.alternateValue : data.ether;

@@ -49,6 +49,10 @@ export class Erc721SalesService extends BaseService {
     protected readonly http: HttpService
   ) {
     super(http)
+  }
+  
+  startProvider() {
+
     // Listen for Transfer event
     this.provider.on({ address: config.contract_address, topics: [topics] }, (event) => {
       this.getTransactionDetails(event).then((res) => {
@@ -60,27 +64,6 @@ export class Erc721SalesService extends BaseService {
       });
     });
 
-    // this code snippet can be useful to test a specific transaction //
-    return
-    const tokenContract = new ethers.Contract(config.contract_address, erc721abi, this.provider);
-    let filter = tokenContract.filters.Transfer();
-    const startingBlock = 15710313  
-    tokenContract.queryFilter(filter, 
-      startingBlock, 
-      startingBlock+1).then(events => {
-      for (const event of events) {
-        this.getTransactionDetails(event).then((res) => {
-          if (!res) return
-          console.log(res)
-          return
-          // Only tweet transfers with value (Ignore w2w transfers)
-          if (res?.ether || res?.alternateValue) this.tweet(res);
-          // If free mint is enabled we can tweet 0 value
-          else if (config.includeFreeMint) this.tweet(res);
-          // console.log(res);
-        });     
-      }
-    });
   }
 
   async getTransactionDetails(tx: ethers.Event): Promise<any> {
@@ -140,8 +123,12 @@ export class Erc721SalesService extends BaseService {
         if (log.address.toLowerCase() === looksRareContractAddressV2.toLowerCase()) {  
           return looksInterfaceV2.parseLog(log);
         }
-      }).filter((log: any) => (log?.name === 'TakerAsk' || log?.name === 'TakerBid') &&
-        log?.args.itemIds.indexOf(tokenId));        
+      })
+      .filter(log => log !== undefined)
+      .filter((log: any) => {
+        return (log?.name === 'TakerAsk' || log?.name === 'TakerBid') &&
+        log?.args.itemIds.map(i => i.toString()).indexOf(tokenId) > -1
+      });
       
       const NFTX = receipt.logs.map((log: any) => {
         // direct buy from vault
@@ -203,7 +190,7 @@ export class Erc721SalesService extends BaseService {
           return blurInterface.parseLog(log);
         }
       }).filter(l => l?.name === 'OrdersMatched' && l?.args.buy.tokenId.toString() === tokenId)
-      
+
       const BLUR_IO_SALES = receipt.logs
         .filter(l => l.address.toLowerCase() === blurBiddingContractAddress.toLowerCase())
         .filter(l => {
@@ -216,11 +203,7 @@ export class Erc721SalesService extends BaseService {
           const relevantDataSlice = relevantData.match(/.{1,64}/g);
           const amount = BigInt(`0x${relevantDataSlice[0]}`)
 
-          // we also need to find the number of token bought in this transaction to adjust the price
-          const count = receipt.logs
-            .filter(l => l.address.toLowerCase() === blurBiddingContractAddress.toLowerCase()).length
-
-          return amount/BigInt(count)
+          return amount
         })
 
       
@@ -239,6 +222,7 @@ export class Erc721SalesService extends BaseService {
             o => o.identifier.toString() === tokenId || 
             o.identifier.toString() === '0');
           const tokenCount = logDescription.args.offer.length;
+          
           if (matchingOffers.length === 0) {
             return
           }
@@ -289,8 +273,7 @@ export class Erc721SalesService extends BaseService {
         // the only way to get an accurate result would be to run an EVM to track
         // internal txs
         const count = receipt.logs
-          .filter(l => l.address.toLowerCase() === '0xf07468ead8cf26c752c676e43c814fee9c8cf402' && 
-          l.topics[0] === '0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925').length
+          .filter(l => l.topics[0] === '0x7dc5c0699ac8dd5250cbe368a2fc3b4a2daadb120ad07f6cccea29f83482686e').length
         alternateValue = parseFloat(ether)/count
       }
 
