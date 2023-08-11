@@ -100,7 +100,7 @@ export class Erc721SalesService extends BaseService {
       // Get transaction
       const transaction = await this.provider.getTransaction(transactionHash);
       const { value } = transaction;
-      const ether = ethers.utils.formatEther(value.toString());
+      let ether = ethers.utils.formatEther(value.toString());
 
       // Get transaction receipt
       const receipt: TransactionReceipt = await this.provider.getTransactionReceipt(transactionHash);
@@ -273,7 +273,16 @@ export class Erc721SalesService extends BaseService {
         // the only way to get an accurate result would be to run an EVM to track
         // internal txs
         const count = receipt.logs
-          .filter(l => l.topics[0] === '0x7dc5c0699ac8dd5250cbe368a2fc3b4a2daadb120ad07f6cccea29f83482686e').length
+          .filter(l => l.topics[0] === '0x7dc5c0699ac8dd5250cbe368a2fc3b4a2daadb120ad07f6cccea29f83482686e' ||
+                       l.topics[0] === '0x1d5e12b51dee5e4d34434576c3fb99714a85f57b0fd546ada4b0bddd736d12b2').length
+        
+        // look for blur.io custom ERC20 token if the ether amount is empty
+        if (ether === '0.0') {
+          const l =  receipt.logs.filter(l => l.address.toLowerCase() === blurBiddingContractAddress.toLowerCase())[0]
+          const relevantData = l.data.substring(2);
+          const relevantDataSlice = relevantData.match(/.{1,64}/g);
+          ether = ''+parseFloat((BigInt(`0x${relevantDataSlice[0]}`) / BigInt('1000000000000000')).toString())/1000;
+        }
         alternateValue = parseFloat(ether)/count
       }
 
