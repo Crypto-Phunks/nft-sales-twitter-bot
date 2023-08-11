@@ -70,7 +70,12 @@
     "collectCoverageFrom": [
       "**/*.(t|j)s"
     ],
+    "coverageReporters": [
+      "html",
+      "cobertura"
+    ],
+    "collectCoverage": true,
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "jsdom"
   }
 }

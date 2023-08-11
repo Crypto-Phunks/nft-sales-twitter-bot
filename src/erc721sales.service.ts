@@ -64,27 +64,6 @@ export class Erc721SalesService extends BaseService {
       });
     });
 
-    // this code snippet can be useful to test a specific transaction //
-    return
-    const tokenContract = new ethers.Contract(config.contract_address, erc721abi, this.provider);
-    let filter = tokenContract.filters.Transfer();
-    const startingBlock = 15710313  
-    tokenContract.queryFilter(filter, 
-      startingBlock, 
-      startingBlock+1).then(events => {
-      for (const event of events) {
-        this.getTransactionDetails(event).then((res) => {
-          if (!res) return
-          console.log(res)
-          return
-          // Only tweet transfers with value (Ignore w2w transfers)
-          if (res?.ether || res?.alternateValue) this.tweet(res);
-          // If free mint is enabled we can tweet 0 value
-          else if (config.includeFreeMint) this.tweet(res);
-          // console.log(res);
-        });     
-      }
-    });
   }
 
   async getTransactionDetails(tx: ethers.Event): Promise<any> {
@@ -144,8 +123,12 @@ export class Erc721SalesService extends BaseService {
         if (log.address.toLowerCase() === looksRareContractAddressV2.toLowerCase()) {  
           return looksInterfaceV2.parseLog(log);
         }
-      }).filter((log: any) => (log?.name === 'TakerAsk' || log?.name === 'TakerBid') &&
-        log?.args.itemIds.indexOf(tokenId));        
+      })
+      .filter(log => log !== undefined)
+      .filter((log: any) => {
+        return (log?.name === 'TakerAsk' || log?.name === 'TakerBid') &&
+        log?.args.itemIds.map(i => i.toString()).indexOf(tokenId) > -1
+      });
       
       const NFTX = receipt.logs.map((log: any) => {
         // direct buy from vault
