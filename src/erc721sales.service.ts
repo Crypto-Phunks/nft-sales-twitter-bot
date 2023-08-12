@@ -276,15 +276,21 @@ export class Erc721SalesService extends BaseService {
         // the only way to get an accurate result would be to run an EVM to track
         // internal txs
         const count = receipt.logs
-          .filter(l => l.topics[0] === '0x7dc5c0699ac8dd5250cbe368a2fc3b4a2daadb120ad07f6cccea29f83482686e' ||
-                       l.topics[0] === '0x1d5e12b51dee5e4d34434576c3fb99714a85f57b0fd546ada4b0bddd736d12b2').length
-        
+          .filter(l => l.address.toLowerCase() === config.contract_address.toLowerCase() && 
+            l.topics[0].toLowerCase() === '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef').length
+
         // look for blur.io custom ERC20 token if the ether amount is empty
         if (ether === '0.0') {
-          const l =  receipt.logs.filter(l => l.address.toLowerCase() === blurBiddingContractAddress.toLowerCase())[0]
-          const relevantData = l.data.substring(2);
-          const relevantDataSlice = relevantData.match(/.{1,64}/g);
-          ether = ''+parseFloat((BigInt(`0x${relevantDataSlice[0]}`) / BigInt('1000000000000000')).toString())/1000;
+          const l = receipt.logs.filter(l => l.address.toLowerCase() === blurBiddingContractAddress.toLowerCase())
+            .reduce((previous, current) => {
+              const relevantData = current.data.substring(2);
+              const relevantDataSlice = relevantData.match(/.{1,64}/g);
+              const value = BigInt(`0x${relevantDataSlice[0]}`);
+              return previous + value
+            }, BigInt(0))
+          
+          ether = (parseFloat((l / BigInt('10000000000000000')).toString())/100).toString()
+          console.log(ether)
         }
         alternateValue = parseFloat(ether)/count
       }
