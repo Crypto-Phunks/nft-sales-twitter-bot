@@ -6,7 +6,7 @@ export const config = {
   //
   // uncomment the 2 lines above to use local images instead of retrieving images from ipfs for each tweet
   use_local_images: true,
-  local_image_path: './token_images/prefix',
+  local_image_path: './token_images/phunk',
   // 
   // this is a configuration for the phunk bid demo extension
   local_bids_image_path: './bids_images/Phunk_',

@@ -69,16 +69,16 @@ export class BaseService {
         this.fiatValues = fiat.ethereum
     });
 
+  }
 
-    if (process.env.DISCORD_TOKEN) {
-      this.client = new Client({ intents: [] });
-      this.client.once('ready', async c => {
-          console.log(`Ready! Logged in as ${c.user.tag}`);
-          this.channel = await this.client.channels.fetch(config.discord_channel) as TextChannel
-      });
-      this.client.login(process.env.DISCORD_TOKEN);
-      this.discordSetup = true;
-    }    
+  setupDiscordClient() {
+    this.client = new Client({ intents: [] });
+    this.client.once('ready', async c => {
+        console.log(`Ready! Logged in as ${c.user.tag}`);
+        this.channel = await this.client.channels.fetch(config.discord_channel) as TextChannel
+    });
+    this.client.login(process.env.DISCORD_TOKEN);
+    this.discordSetup = true;    
   }
 
   getWeb3Provider() {
@@ -113,21 +113,22 @@ export class BaseService {
 
   async dispatch(data: TweetRequest) {
     const tweet = await this.tweet(data)
-    this.discord(data, tweet.id)
+    await this.discord(data, tweet.id)
   }
 
   async discord(data: TweetRequest, tweetId:string) {
     if (!this.discordSetup) return
     
     let template = config.saleMessageDiscord
-    template = template.replace(new RegExp('<tweetLink>', 'g'), `<https://twitter.com/i/web/status/${data.tokenId}>`);
-
-    const tweetText = this.formatText(data, config.saleMessageDiscord)
-    this.channel.send({
+    template = template.replace(new RegExp('<tweetLink>', 'g'), `<https://twitter.com/i/web/status/${tweetId}>`);
+    const image = config.use_local_images ? data.imageUrl : this.transformImage(data.imageUrl);
+    const tweetText = this.formatText(data, template)
+    await this.channel.send({
         content: tweetText,
-        files: ['./auction_images/phunk1.png']
+        files: [image]
     });
-}
+  }
+
   async tweet(data: TweetRequest) {
 
     let template: string = data.type === TweetType.SALE ? config.saleMessage : 

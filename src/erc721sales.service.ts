@@ -53,6 +53,8 @@ export class Erc721SalesService extends BaseService {
   
   startProvider() {
 
+    this.setupDiscordClient()
+    
     // Listen for Transfer event
     this.provider.on({ address: config.contract_address, topics: [topics] }, (event) => {
       this.getTransactionDetails(event).then((res) => {
