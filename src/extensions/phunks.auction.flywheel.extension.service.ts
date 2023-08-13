@@ -21,7 +21,7 @@ export class PhunksAuctionFlywheelService extends BaseService {
     let filter = tokenContract.filters.PhunkSoldViaSignature();
     tokenContract.on(filter, (async (phunkId, minSalePrice, seller, event) => {
       const imageUrl = `${config.local_auction_image_path}${phunkId}.png`;
-      const value = ethers.utils.formatEther(minSalePrice)
+      const value = ethers.formatEther(minSalePrice)
       // If ens is configured, get ens addresses
       let ensTo: string;
       if (config.ens) {
@@ -46,9 +46,9 @@ export class PhunksAuctionFlywheelService extends BaseService {
       17616760, 
       17616760).then(async (events) => {
       for (const event of events) {
-        const { phunkId, minSalePrice, seller, auctionId } = event.args
+        const { phunkId, minSalePrice, seller, auctionId } = (event as any).args
         const imageUrl = `${config.local_auction_image_path}${phunkId}.png`;
-        const value = ethers.utils.formatEther(minSalePrice)
+        const value = ethers.formatEther(minSalePrice)
         // If ens is configured, get ens addresses
         let ensTo: string;
         if (config.ens) {
