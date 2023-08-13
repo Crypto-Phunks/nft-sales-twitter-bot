@@ -1,10 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
-import {
-  TransactionReceipt,
-  Log
-} from "@ethersproject/abstract-provider";
-import { BigNumber, ethers } from 'ethers';
+import { AbiCoder, TransactionReceipt, ethers } from 'ethers';
 import { hexToNumberString } from 'web3-utils';
 import erc721abi from './abi/erc721.json'
 import dotenv from 'dotenv';
@@ -29,12 +25,12 @@ const blurSalesContractAddressV3 = '0xb2ecfe4e4d61f8790bbb9de2d1259b9e2410cea5';
 const blurSalesContractAddressV2 = '0x39da41747a83aeE658334415666f3EF92DD0D541';
 const blurBiddingContractAddress = '0x0000000000a39bb272e79075ade125fd351887ac';
 
-const looksInterface = new ethers.utils.Interface(looksRareABI);
-const looksInterfaceV2 = new ethers.utils.Interface(looksRareABIv2);
-const blurInterface = new ethers.utils.Interface(blurABI);
-const blurSalesInterface = new ethers.utils.Interface(blurSalesABI);
-const nftxInterface = new ethers.utils.Interface(nftxABI);
-const seaportInterface = new ethers.utils.Interface(openseaSeaportABI);
+const looksInterface = new ethers.Interface(looksRareABI);
+const looksInterfaceV2 = new ethers.Interface(looksRareABIv2);
+const blurInterface = new ethers.Interface(blurABI);
+const blurSalesInterface = new ethers.Interface(blurSalesABI);
+const nftxInterface = new ethers.Interface(nftxABI);
+const seaportInterface = new ethers.Interface(openseaSeaportABI);
 
 // This can be an array if you want to filter by multiple topics
 // 'Transfer' topic
@@ -68,7 +64,7 @@ export class Erc721SalesService extends BaseService {
 
   }
 
-  async getTransactionDetails(tx: ethers.Event): Promise<any> {
+  async getTransactionDetails(tx: any): Promise<any> {
     // uncomment this to test a specific transaction
     // if (tx.transactionHash !== '0xcee5c725e2234fd0704e1408cdf7f71d881e67f8bf5d6696a98fdd7c0bcf52f3') return;
     
@@ -77,8 +73,9 @@ export class Erc721SalesService extends BaseService {
     try {
 
       // Get addresses of seller / buyer from topics
-      let from = ethers.utils.defaultAbiCoder.decode(['address'], tx?.topics[1])[0];
-      let to = ethers.utils.defaultAbiCoder.decode(['address'], tx?.topics[2])[0];
+      const coder = AbiCoder.defaultAbiCoder()
+      let from = coder.decode(['address'], tx?.topics[1])[0];
+      let to = coder.decode(['address'], tx?.topics[2])[0];
       
       // ignore internal transfers to contract, another transfer event will handle this 
       // transaction afterward (the one that'll go to the buyer wallet)
@@ -97,12 +94,12 @@ export class Erc721SalesService extends BaseService {
       // Get transaction hash
       const { transactionHash } = tx;
       console.log(`handling ${transactionHash}`)
-      const isMint = BigNumber.from(from).isZero();
+      const isMint = BigInt(from) === BigInt(0);
 
       // Get transaction
       const transaction = await this.provider.getTransaction(transactionHash);
       const { value } = transaction;
-      let ether = ethers.utils.formatEther(value.toString());
+      let ether = ethers.formatEther(value.toString());
 
       // Get transaction receipt
       const receipt: TransactionReceipt = await this.provider.getTransactionReceipt(transactionHash);
@@ -197,7 +194,7 @@ export class Erc721SalesService extends BaseService {
         .filter(l => l.address.toLowerCase() === blurBiddingContractAddress.toLowerCase())
         .filter(l => {
           // find payment to blur
-          const address = ethers.utils.defaultAbiCoder.decode(['address'], l?.topics[2])[0].toLowerCase()
+          const address = AbiCoder.defaultAbiCoder().decode(['address'], l?.topics[2])[0].toLowerCase()
           return address === blurSalesContractAddressV3.toLowerCase() || address === blurSalesContractAddressV2.toLowerCase()
         })
         .map(l => {
@@ -243,15 +240,15 @@ export class Erc721SalesService extends BaseService {
 
       if (LR.length) {
         const weiValue = (LR[0]?.args?.price)?.toString();
-        const value = ethers.utils.formatEther(weiValue);
+        const value = ethers.formatEther(weiValue);
         alternateValue = parseFloat(value);
       } else if (LRV2.length) {
         const weiValue = (LRV2[0]?.args?.feeAmounts[0])?.toString();
-        const value = ethers.utils.formatEther(weiValue);
+        const value = ethers.formatEther(weiValue);
         alternateValue = parseFloat(value);
       } else if (NFTX.length) {
         // find the number of token transferred to adjust amount per token
-        const redeemLog = receipt.logs.filter((log: any) => log.topics[0].toLowerCase() === '0x63b13f6307f284441e029836b0c22eb91eb62a7ad555670061157930ce884f4e')[0]
+        const redeemLog = receipt.logs.filter((log: any) => log.topics[0].toLowerCase() === '0x63b13f6307f284441e029836b0c22eb91eb62a7ad555670061157930ce884f4e')[0] as any
         const parsedLog = nftxInterface.parseLog(redeemLog)
         const tokenCount = Math.max(parsedLog.args.nftIds.length, 1)
         alternateValue = parseFloat(NFTX[0].toString())/tokenCount/1000;
@@ -263,13 +260,13 @@ export class Erc721SalesService extends BaseService {
         alternateValue = parseFloat(OPENSEA_SEAPORT[0].toString())/1000;
       } else if (BLUR_IO.length) {
         const weiValue = (BLUR_IO[0]?.args?.buy.price)?.toString();
-        const value = ethers.utils.formatEther(weiValue);
+        const value = ethers.formatEther(weiValue);
         alternateValue = parseFloat(value);
       } else if (BLUR_IO_SALES.length) {
         const weiValue = BLUR_IO_SALES.reduce((previous,current) => previous + current, BigInt(0));
         const count = receipt.logs
           .filter(l => l.address.toLowerCase() === config.contract_address.toLowerCase()).length
-        const value = ethers.utils.formatEther(weiValue/BigInt(count));
+        const value = ethers.formatEther(weiValue/BigInt(count));
 
         alternateValue = parseFloat(value);
       } else if (BLUR_IO_SWEEP.length) {

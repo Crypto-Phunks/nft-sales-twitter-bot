@@ -21,7 +21,7 @@ export class PhunksBidService extends BaseService {
     let filter = tokenContract.filters.PhunkBidEntered();
     tokenContract.on(filter, (async (token, amount, from, event) => {
       const imageUrl = `${config.local_bids_image_path}${token}.png`;
-      const value = ethers.utils.formatEther(amount)
+      const value = ethers.formatEther(amount)
       // If ens is configured, get ens addresses
       let ensFrom: string;
       if (config.ens) {
