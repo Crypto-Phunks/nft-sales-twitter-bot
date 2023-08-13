@@ -4,6 +4,7 @@ import { HttpModule } from '@nestjs/axios';
 import { ethers } from 'ethers';
 import { config } from './config';
 import erc721abi from './abi/erc721.json'
+import { TweetRequest } from './base.service';
 
 describe('Erc721SalesService', () => {
   let service: Erc721SalesService;
@@ -60,8 +61,7 @@ describe('Erc721SalesService', () => {
     })
     console.log(logs)
   })
-
-  it('blur single sale with ERC20 payment - 0xee4724d86a4e7c07117b6656267e1e0769879615a4dffdabb69a57d7786345b2', async () => {
+  it('blur single sale with ERC20 payment - 0x2212e9d1f1861e83b840fd8b5d5f7818c59e9c1f896d361abfcedb3eb722a26e', async () => {
     const provider = service.getWeb3Provider()
     config.contract_address = '0xA6Cd272874Ee7C872Eb66801Eff62784C0b13285'
     const tokenContract = new ethers.Contract('0xA6Cd272874Ee7C872Eb66801Eff62784C0b13285', erc721abi, provider);
@@ -110,5 +110,27 @@ describe('Erc721SalesService', () => {
         expect(result.alternateValue).toBe(0.0413)
     }
   })
+  
+  /*
+  it('should be able to post on discord', async () => {
 
+    const tweetData:TweetRequest =  {
+      from: '0x787...Fe83d',
+      to: '0x5Ba...dcb29',
+      tokenId: '5682',
+      ether: 0,
+      transactionHash: '0xee4724d86a4e7c07117b6656267e1e0769879615a4dffdabb69a57d7786345b2',
+      alternateValue: 0.03,
+      type: 0,
+      imageUrl: './token_images/prefix5682.png'
+    }
+    await delay(1000)
+    await service.discord(tweetData)
+    
+  });
+  */
 });
+
+function delay(ms: number) {
+  return new Promise( resolve => setTimeout(resolve, ms) );
+}

@@ -49,6 +49,14 @@ class, an example is provided in  the `extensions/phunks.bid.extension.service.t
 })
 ```
 
+## Discord support
+
+Just add a `DISCORD_TOKEN` in your `.env` file, also add `saleMessageDiscord` and `discord_channel` keys. The later must contain the identifier of the channel you want the bot to post the sale events in. You'll also need the `local_image_path` containing tokens images.
+
+You can add a link to the tweet that's been generated in the discord message using `<tweetLink>` in your `saleMessageDiscord` template.
+
+To setup the bot, lead to https://discord.com/developers and create an application and a bot, then invite the bot you just created using the following link: https://discord.com/api/oauth2/authorize?client_id=[yourDiscordAppclientId]&permissions=2048&scope=bot then ensure that the invited bot is allowed to access the channel ID you want your bot to post into.
+
 ## Running the app
 
 ```bash

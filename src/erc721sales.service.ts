@@ -46,7 +46,7 @@ export class Erc721SalesService extends BaseService {
   provider = this.getWeb3Provider();
 
   constructor(
-    protected readonly http: HttpService
+    protected readonly http: HttpService,
   ) {
     super(http)
   }
@@ -58,7 +58,7 @@ export class Erc721SalesService extends BaseService {
       this.getTransactionDetails(event).then((res) => {
         if (!res) return
         // Only tweet transfers with value (Ignore w2w transfers)
-        if (res?.ether || res?.alternateValue) this.tweet(res);
+        if (res?.ether || res?.alternateValue) this.dispatch(res);
         // If free mint is enabled we can tweet 0 value
         else if (config.includeFreeMint) this.tweet(res);
       });

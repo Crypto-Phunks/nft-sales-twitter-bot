@@ -11,7 +11,7 @@ export class PhunksAuctionHouseService extends BaseService {
   provider = this.getWeb3Provider();
 
   constructor(
-    protected readonly http: HttpService
+    protected readonly http: HttpService,
   ) {
     super(http)
     console.log('creating PhunksAuctionHouseService')
