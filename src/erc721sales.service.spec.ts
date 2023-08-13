@@ -61,6 +61,7 @@ describe('Erc721SalesService', () => {
     })
     console.log(logs)
   })
+
   it('blur single sale with ERC20 payment - 0x2212e9d1f1861e83b840fd8b5d5f7818c59e9c1f896d361abfcedb3eb722a26e', async () => {
     const provider = service.getWeb3Provider()
     config.contract_address = '0xA6Cd272874Ee7C872Eb66801Eff62784C0b13285'

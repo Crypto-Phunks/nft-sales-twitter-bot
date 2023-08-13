@@ -57,6 +57,14 @@ You can add a link to the tweet that's been generated in the discord message usi
 
 To setup the bot, lead to https://discord.com/developers and create an application and a bot, then invite the bot you just created using the following link: https://discord.com/api/oauth2/authorize?client_id=[yourDiscordAppclientId]&permissions=2048&scope=bot then ensure that the invited bot is allowed to access the channel ID you want your bot to post into.
 
+## CLI mode
+
+You can use this app as a standalone cli using the following command line along with the `block` and `tx` parameter. The optional `contract` parameter can be used to override the contract from the configuration. ie:
+
+```
+npm run cli -- --contract=0xA6Cd272874Ee7C872Eb66801Eff62784C0b13285 --block=17886451 --tx=0x6018d9290709e7d34c820b23820aaacf960af9c4f073b661136d49fc0994d6c9
+```
+
 ## Running the app
 
 ```bash

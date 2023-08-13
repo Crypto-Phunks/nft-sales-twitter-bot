@@ -7,6 +7,7 @@
   "scripts": {
     "prebuild": "rimraf dist",
     "build": "nest build",
+    "cli": "nest start --entryFile cli.module.js --",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
@@ -34,7 +35,8 @@
     "rxjs": "^7.2.0",
     "service": "^0.1.4",
     "twitter-api-v2": "^1.15.0",
-    "web3-utils": "^1.7.1"
+    "web3-utils": "^1.7.1",
+    "yargs": "^17.7.2"
   },
   "devDependencies": {
     "@nestjs/cli": "^8.0.0",

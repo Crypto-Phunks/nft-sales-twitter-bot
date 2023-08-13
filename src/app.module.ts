@@ -25,6 +25,7 @@ import { PhunksAuctionFlywheelService } from './extensions/phunks.auction.flywhe
 export class AppModule {
 
   constructor(private saleService:Erc721SalesService) {
-    this.saleService.startProvider()
+    if (!global.doNotStartProvider)
+      this.saleService.startProvider()
   }
 }
