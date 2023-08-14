@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
-import { BaseService, TweetRequest, TweetType } from '../base.service';
+import { BaseService, TweetRequest } from '../base.service';
 import { ethers } from 'ethers';
 import notLarvaLabsAbi from '../abi/notlarvalabs.json';
 import { config } from '../config';
@@ -33,11 +33,12 @@ export class PhunksBidService extends BaseService {
         ether: parseFloat(value),
         transactionHash: event.transactionHash,
         alternateValue: 0,
-        type: TweetType.BID_ENTERED,
         imageUrl
       }
-      this.tweet(request);
+      const tweet = await this.tweet(request, config.bidMessage);
+      await this.discord(request, tweet.id, config.bidMessageDiscord);
     }))
+
     /*
     tokenContract.queryFilter(filter, 
       15097563, 
@@ -61,7 +62,8 @@ export class PhunksBidService extends BaseService {
           type: TweetType.BID_ENTERED,
           imageUrl
         }
-        this.tweet(request);
+        const tweet = await this.tweet(request, config.bidMessage);
+        await this.discord(request, tweet.id, config.bidMessageDiscord);
       }
     });
     */

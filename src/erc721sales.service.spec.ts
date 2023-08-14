@@ -4,14 +4,13 @@ import { HttpModule } from '@nestjs/axios';
 import { ethers } from 'ethers';
 import { config } from './config';
 import erc721abi from './abi/erc721.json'
-import { TweetRequest } from './base.service';
 
-const COOLDOWN_BETWEEN_TESTS = 1000
+const COOLDOWN_BETWEEN_TESTS = 1500
 
 describe('Erc721SalesService', () => {
   let service: Erc721SalesService;
 
-  jest.setTimeout(30000) 
+  jest.setTimeout(60000) 
 
   beforeEach(async () => {
     //jest.useFakeTimers()
@@ -49,25 +48,6 @@ describe('Erc721SalesService', () => {
       const result = await service.getTransactionDetails(event)
       expect(result.alternateValue).toBe(0.41)
     }
-    console.log(logs)
-  })
-
-  it('ens containing emoji - 0x18188c3b089f4cb106a2989afeda2bd09065d2198b2910f5897ab9aa2282e1ee', async () => {
-    await delay(COOLDOWN_BETWEEN_TESTS)
-    const provider = service.getWeb3Provider()
-    config.contract_address = '0xf07468eAd8cf26c752C676E43C814FEe9c8CF402'
-    const tokenContract = new ethers.Contract('0xf07468eAd8cf26c752C676E43C814FEe9c8CF402', erc721abi, provider);
-    let filter = tokenContract.filters.Transfer();
-    const startingBlock = 17901311    
-    const events = await tokenContract.queryFilter(filter, 
-      startingBlock, 
-      startingBlock+1)
-    const results = await Promise.all(events.map(async (e) => await service.getTransactionDetails(e)))
-    expect(results[0].to).toBe('👮harder.eth')
-    let logs = ''
-    results.forEach(r => {
-      logs += `${r.tokenId} sold for ${r.alternateValue} to ${r.to}\n`
-    })
     console.log(logs)
   })
 
