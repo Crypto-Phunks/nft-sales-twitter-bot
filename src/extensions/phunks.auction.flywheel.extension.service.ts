@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
-import { BaseService, TweetRequest, TweetType } from '../base.service';
+import { BaseService, TweetRequest } from '../base.service';
 import { ethers } from 'ethers';
 import phunkAuctionFlywheel from '../abi/phunkAuctionFlywheel.json';
 import { config } from '../config';
@@ -34,10 +34,10 @@ export class PhunksAuctionFlywheelService extends BaseService {
         ether: parseFloat(value),
         transactionHash: event.transactionHash,
         alternateValue: 0,
-        type: TweetType.FLYWHEEL_SOLD,
         imageUrl
       }
-      this.tweet(request);
+      const tweet = await this.tweet(request, config.flywheelMessage);
+      await this.discord(request, tweet.id, config.flywheelMessageDiscord);
     }))
     
     // uncomment the `return` below to test a specific block
@@ -61,10 +61,10 @@ export class PhunksAuctionFlywheelService extends BaseService {
           ether: parseFloat(value),
           transactionHash: event.transactionHash,
           alternateValue: 0,
-          type: TweetType.FLYWHEEL_SOLD,
           imageUrl
         }
-        this.tweet(request);
+        const tweet = await this.tweet(request, config.flywheelMessage);
+        await this.discord(request, tweet.id, config.flywheelMessageDiscord);
       }
     });
   }

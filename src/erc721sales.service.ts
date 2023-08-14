@@ -14,7 +14,7 @@ import nftxABI from './abi/nftxABI.json';
 import openseaSeaportABI from './abi/seaportABI.json';
 
 import { config } from './config';
-import { BaseService, TweetRequest, TweetType } from './base.service';
+import { BaseService, TweetRequest } from './base.service';
 
 const looksRareContractAddress = '0x59728544b08ab483533076417fbbb2fd0b17ce3a'; // Don't change unless deprecated
 const looksRareContractAddressV2 = '0x0000000000e655fae4d56241588680f86e3b2377'; // Don't change unless deprecated
@@ -49,7 +49,7 @@ export class Erc721SalesService extends BaseService {
   
   startProvider() {
 
-    this.setupDiscordClient()
+    this.initDiscordClient()
     
     // Listen for Transfer event
     this.provider.on({ address: config.contract_address, topics: [topics] }, (event) => {
@@ -322,7 +322,6 @@ export class Erc721SalesService extends BaseService {
         ether: parseFloat(ether),
         transactionHash,
         alternateValue,
-        type: TweetType.SALE
       };
 
       // If the image was successfully obtained

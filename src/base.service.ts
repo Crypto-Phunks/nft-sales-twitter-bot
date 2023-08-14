@@ -2,42 +2,22 @@ import { Injectable } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import fs from 'fs';
 import fiatSymbols from './fiat-symobols.json';
-import { EUploadMimeType, TwitterApi } from 'twitter-api-v2';
-
 import { ethers } from 'ethers';
-
 import { catchError, firstValueFrom, map, Observable, of, switchMap, timer } from 'rxjs';
-
 import currency from 'currency.js';
 
 import dotenv from 'dotenv';
 dotenv.config();
 
-import looksRareABI from './abi/looksRareABI.json';
-
 import { config } from './config';
 import { Client, TextChannel } from 'discord.js';
+import TwitterClient from './clients/twitter';
+import { EUploadMimeType } from 'twitter-api-v2';
+import DiscordClient from './clients/discord';
 
 export const alchemyAPIUrl = 'https://eth-mainnet.alchemyapi.io/v2/';
 export const alchemyAPIKey = process.env.ALCHEMY_API_KEY;
-
-const tokenContractAddress = config.contract_address;
-
 const provider = ethers.getDefaultProvider(alchemyAPIUrl + alchemyAPIKey);
-
-const v2Client = process.env.hasOwnProperty('TWITTER_ACCESS_TOKEN_KEY') ? new TwitterApi({
-  accessToken: process.env.TWITTER_ACCESS_TOKEN_KEY,
-  accessSecret: process.env.TWITTER_ACCESS_TOKEN_SECRET,
-  appKey: process.env.TWITTER_API_KEY,
-  appSecret: process.env.TWITTER_API_KEY_SECRET,
-}) : undefined;
-
-export enum TweetType {
-  SALE,
-  AUCTION_SETTLED,
-  FLYWHEEL_SOLD,
-  BID_ENTERED
-}
 
 export interface TweetRequest {
   from: any;
@@ -48,7 +28,6 @@ export interface TweetRequest {
   alternateValue: number;
   imageUrl?: string;
   additionalText?: string;
-  type:TweetType;
 }
 
 @Injectable()
@@ -56,9 +35,8 @@ export class BaseService {
   
   fiatValues: any;
 
-  client:Client;
-  channel: TextChannel;
-  discordSetup: boolean = false;
+  twitterClient: TwitterClient;
+  discordClient: DiscordClient;
 
   constructor(
     protected readonly http: HttpService
@@ -68,17 +46,13 @@ export class BaseService {
       if (fiat && fiat.ethereum && Object.values(fiat.ethereum).length)
         this.fiatValues = fiat.ethereum
     });
+    this.twitterClient = new TwitterClient()
+    this.discordClient = new DiscordClient()
 
   }
 
-  setupDiscordClient() {
-    this.client = new Client({ intents: [] });
-    this.client.once('ready', async c => {
-        console.log(`Ready! Logged in as ${c.user.tag}`);
-        this.channel = await this.client.channels.fetch(config.discord_channel) as TextChannel
-    });
-    this.client.login(process.env.DISCORD_TOKEN);
-    this.discordSetup = true;    
+  initDiscordClient() {
+    this.discordClient.init()
   }
 
   getWeb3Provider() {
@@ -96,7 +70,7 @@ export class BaseService {
     return await firstValueFrom(
       this.http.get(url, {
         params: {
-          contractAddress: tokenContractAddress,
+          contractAddress: config.contract_address,
           tokenId,
           tokenType: 'erc721'
         }
@@ -115,25 +89,16 @@ export class BaseService {
     const tweet = await this.tweet(data)
     await this.discord(data, tweet.id)
   }
-
-  async discord(data: TweetRequest, tweetId:string) {
-    if (!this.discordSetup) return
-    
-    let template = config.saleMessageDiscord
+  
+  async discord(data: TweetRequest, tweetId:string, template:string=config.saleMessageDiscord) {
+    if (!this.discordClient.setup) return
     template = template.replace(new RegExp('<tweetLink>', 'g'), `<https://twitter.com/i/web/status/${tweetId}>`);
     const image = config.use_local_images ? data.imageUrl : this.transformImage(data.imageUrl);
     const tweetText = this.formatText(data, template)
-    await this.channel.send({
-        content: tweetText,
-        files: [image]
-    });
+    await this.discordClient.send(tweetText, image);
   }
 
-  async tweet(data: TweetRequest) {
-
-    let template: string = data.type === TweetType.SALE ? config.saleMessage : 
-                            data.type === TweetType.BID_ENTERED ? config.bidMessage : 
-                            data.type === TweetType.FLYWHEEL_SOLD ? config.flywheelMessage : config.auctionMessage;
+  async tweet(data: TweetRequest, template:string=config.saleMessage) {
 
     const tweetText = this.formatText(data, template)
     
@@ -146,14 +111,14 @@ export class BaseService {
     let media_id: string;
     if (processedImage) {
       // Upload the item's image to Twitter & retrieve a reference to it
-      media_id = await v2Client.v1.uploadMedia(processedImage, {
+      media_id = await this.twitterClient.uploadMedia(processedImage, {
         mimeType: EUploadMimeType.Png,
       });
     }
 
     // Post the tweet 👇
     // If you need access to this endpoint, you’ll need to apply for Elevated access via the Developer Portal. You can learn more here: https://developer.twitter.com/en/docs/twitter-api/getting-started/about-twitter-api#v2-access-leve
-    const { data: createdTweet, errors: errors } = await v2Client.v2.tweet(
+    const { data: createdTweet, errors: errors } = await this.twitterClient.tweet(
       tweetText,
       { media: { media_ids: [media_id] } },
     );
