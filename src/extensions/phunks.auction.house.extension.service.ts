@@ -15,7 +15,8 @@ export class PhunksAuctionHouseService extends BaseService {
   ) {
     super(http)
     console.log('creating PhunksAuctionHouseService')
-
+    this.initDiscordClient()
+    
     // Listen for auction settled event
     const tokenContract = new ethers.Contract('0x0e7f7d8007c0fccac2a813a25f205b9030697856', phunksAuctionHouse, this.provider);
     let filter = tokenContract.filters.AuctionSettled();

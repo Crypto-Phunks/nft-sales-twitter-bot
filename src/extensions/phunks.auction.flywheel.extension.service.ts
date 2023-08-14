@@ -15,7 +15,9 @@ export class PhunksAuctionFlywheelService extends BaseService {
   ) {
     super(http)
     console.log('creating PhunksAuctionFlywheelService')
-
+    
+    this.initDiscordClient()
+    
     // Listen for auction settled event
     const tokenContract = new ethers.Contract('0x86b525ab8c5c9b8852f3a1bc79376335bcd2f962', phunkAuctionFlywheel, this.provider);
     let filter = tokenContract.filters.PhunkSoldViaSignature();

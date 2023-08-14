@@ -16,6 +16,8 @@ export class PhunksBidService extends BaseService {
     super(http)
     console.log('creating PhunksBidService')
 
+    this.initDiscordClient()
+    
     // Listen for Bid event
     const tokenContract = new ethers.Contract('0xd6c037bE7FA60587e174db7A6710f7635d2971e7', notLarvaLabsAbi, this.provider);
     let filter = tokenContract.filters.PhunkBidEntered();
