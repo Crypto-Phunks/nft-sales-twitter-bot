@@ -19,7 +19,11 @@ export class PhunksBidService extends BaseService {
     // Listen for Bid event
     const tokenContract = new ethers.Contract('0xd6c037bE7FA60587e174db7A6710f7635d2971e7', notLarvaLabsAbi, this.provider);
     let filter = tokenContract.filters.PhunkBidEntered();
-    tokenContract.on(filter, (async (token, amount, from, event) => {
+    tokenContract.on(filter, (async (event) => {
+      const token = event.args.phunkIndex
+      const amount = event.args.value
+      const from = event?.args[2];
+
       const imageUrl = `${config.local_bids_image_path}${token}.png`;
       const value = ethers.formatEther(amount)
       // If ens is configured, get ens addresses
@@ -42,7 +46,7 @@ export class PhunksBidService extends BaseService {
     /*
     tokenContract.queryFilter(filter, 
       15097563, 
-      15097563).then(async (events) => {
+      15097563).then(async (events:any) => {
       for (const event of events) {
         if (event?.args.length < 3) return
         const from = event?.args[2];
@@ -50,8 +54,8 @@ export class PhunksBidService extends BaseService {
         let ensFrom: string;
         if (config.ens) {
           ensFrom = await this.provider.lookupAddress(`${from}`);
-        }      
-        const value = ethers.utils.formatEther(event.args.value);
+        }
+        const value = ethers.formatEther(event.args.value);
         const imageUrl = `${config.local_bids_image_path}${event.args.phunkIndex}.png`;
         const request:TweetRequest = {
           from: ensFrom ?? from,
@@ -59,7 +63,6 @@ export class PhunksBidService extends BaseService {
           ether: parseFloat(value),
           transactionHash: event.transactionHash,
           alternateValue: 0,
-          type: TweetType.BID_ENTERED,
           imageUrl
         }
         const tweet = await this.tweet(request, config.bidMessage);

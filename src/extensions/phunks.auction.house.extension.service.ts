@@ -19,7 +19,8 @@ export class PhunksAuctionHouseService extends BaseService {
     // Listen for auction settled event
     const tokenContract = new ethers.Contract('0x0e7f7d8007c0fccac2a813a25f205b9030697856', phunksAuctionHouse, this.provider);
     let filter = tokenContract.filters.AuctionSettled();
-    tokenContract.on(filter, (async (phunkId, auctionId, winner, amount, event) => {
+    tokenContract.on(filter, (async (event) => {
+      const { phunkId, winner, amount, auctionId } =  ( event as any).args
       const imageUrl = `${config.local_auction_image_path}${phunkId}.png`;
       const value = ethers.formatEther(amount)
       // If ens is configured, get ens addresses

@@ -19,7 +19,8 @@ export class PhunksAuctionFlywheelService extends BaseService {
     // Listen for auction settled event
     const tokenContract = new ethers.Contract('0x86b525ab8c5c9b8852f3a1bc79376335bcd2f962', phunkAuctionFlywheel, this.provider);
     let filter = tokenContract.filters.PhunkSoldViaSignature();
-    tokenContract.on(filter, (async (phunkId, minSalePrice, seller, event) => {
+    tokenContract.on(filter, (async (event) => {
+      const { phunkId, minSalePrice, seller, auctionId } = (event as any).args
       const imageUrl = `${config.local_auction_image_path}${phunkId}.png`;
       const value = ethers.formatEther(minSalePrice)
       // If ens is configured, get ens addresses
