@@ -17,17 +17,25 @@ import DiscordClient from './clients/discord';
 
 export const alchemyAPIUrl = 'https://eth-mainnet.alchemyapi.io/v2/';
 export const alchemyAPIKey = process.env.ALCHEMY_API_KEY;
-const provider = ethers.getDefaultProvider(alchemyAPIUrl + alchemyAPIKey);
+//const provider = ethers.getDefaultProvider(alchemyAPIUrl + alchemyAPIKey);
+const provider = ethers.getDefaultProvider(process.env.GETH_NODE_ENDPOINT);
 
 export interface TweetRequest {
+  platform: string,
+  logIndex: number,
+  eventType: string,
+  initialFrom:string, 
+  initialTo?:string, 
   from: any;
   to?: any;
   tokenId: string;
   ether: number;
   transactionHash: string;
+  transactionDate: string;
   alternateValue: number;
   imageUrl?: string;
   additionalText?: string;
+
 }
 
 @Injectable()
@@ -95,7 +103,7 @@ export class BaseService {
     template = template.replace(new RegExp('<tweetLink>', 'g'), `<https://twitter.com/i/web/status/${tweetId}>`);
     const image = config.use_local_images ? data.imageUrl : this.transformImage(data.imageUrl);
     const tweetText = this.formatText(data, template)
-    await this.discordClient.send(tweetText, image);
+    await this.discordClient.send(tweetText, [image]);
   }
 
   async tweet(data: TweetRequest, template:string=config.saleMessage) {

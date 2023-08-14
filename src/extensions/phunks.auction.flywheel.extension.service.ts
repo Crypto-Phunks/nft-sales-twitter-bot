@@ -27,8 +27,16 @@ export class PhunksAuctionFlywheelService extends BaseService {
       let ensTo: string;
       if (config.ens) {
         ensTo = await this.provider.lookupAddress(`${seller}`);
-      }      
+      }
+      const block = await this.provider.getBlock(event.tx.blockNumber)
+      const transactionDate = block.date.toISOString()
+
       const request:TweetRequest = {
+        logIndex: event.index,
+        eventType: 'sale',
+        platform: 'flywheel',
+        transactionDate,
+        initialFrom: seller,
         from: this.shortenAddress('0x0e7f7d8007c0fccac2a813a25f205b9030697856'),
         tokenId: phunkId,
         to: ensTo ?? this.shortenAddress(seller),
@@ -55,7 +63,16 @@ export class PhunksAuctionFlywheelService extends BaseService {
         if (config.ens) {
           ensTo = await this.provider.lookupAddress(`${seller}`);
         }      
+        
+        const block = await this.provider.getBlock(event.blockNumber)
+        const transactionDate = block.date.toISOString()
         const request:TweetRequest = {
+          logIndex: event.index,
+          eventType: 'sale',
+          platform: 'flywheel',
+          initialFrom: '0x0e7f7d8007c0fccac2a813a25f205b9030697856',
+          initialTo: seller,
+          transactionDate,
           from: this.shortenAddress('0x0e7f7d8007c0fccac2a813a25f205b9030697856'),
           tokenId: phunkId,
           to: ensTo ?? this.shortenAddress(seller),

@@ -1,8 +1,12 @@
 export const config = {
   // Contract Address ======================================== //
   contract_address: '0xf07468eAd8cf26c752C676E43C814FEe9c8CF402',
+  // Enter the block where your contract has been created
+  statistic_initial_block: 12674389,
   //
-  discord_channel: '919681244537716767',
+  discord_channels: '919681244537716767,968448656221011981',
+  discord_client_id: '1139547496033558561',
+  discord_guild_ids: '880485569652740136,968448656221011978',
   //
   // uncomment the 2 lines above to use local images instead of retrieving images from ipfs for each tweet
   use_local_images: true,
@@ -10,6 +14,7 @@ export const config = {
   // 
   // this is a configuration for the phunk bid demo extension
   local_bids_image_path: './bids_images/Phunk_',
+  discord_owned_tokens_image_path: 'http://70.34.216.182/token_images/phunk<tokenId>.png',
   // this is a configuration for the phunk auction house demo extension
   local_auction_image_path: './auction_images/phunk',
   //
@@ -25,6 +30,9 @@ export const config = {
   // <txHash> =========================== The transaction hash //
   // <from> ===================================== From address //
   // <to> ========================================= To address //
+  ownedTokensMessageDiscord: 'Here are the tokens owned by the wallet: `<wallet>`!\n\n<tokens>\n\n-- Indexing in progress, last event indexed: `<last_event>`',
+  userStatisticsMessageDiscord: 'Hey, here are the stats you requested about `<wallet>`!\n\n⏳ It holded a Cryptophunks for the first time <holder_since> days ago.\n💰 It executed <tx_count> transactions involving phunks with a total volume of <volume>Ξ.\n🧮 It is currently holding <owned_tokens> tokens.\n\n-- Indexing in progress, last event indexed: `<last_event>`',
+  globalStatisticsMessageDiscord: 'Hey, here are the volume per platform (time window: <window>) ! 💰\n\nNot larva labs: <nll_volume>Ξ\nLooks rare: <lr_volume>Ξ\nBlur IO: <blurio_volume>Ξ\nNFTX: <nftx_volume>Ξ\nX2Y2: <x2y2_volume>Ξ\nOpensea: <os_volume>Ξ\nCargo: <cargo_volume>Ξ\nRarible: <rarible_volume>Ξ\nUnknown: <unknown_volume>Ξ\n—\nTotal: <total_volume>Ξ\n\n— Indexing in progress, last event indexed: `<last_event>`',
   saleMessageDiscord: '🚨 Cryptophunks #<tokenId> was sold for 💰 <ethPrice> (<fiatPrice>)\n\nfrom: <from>\nto: <to>\n\n<tweetLink>\n',
   saleMessage: '🚨 Cryptophunks #<tokenId> was sold for 💰 <ethPrice> (<fiatPrice>)\n\nfrom: <from>\nto: <to>\n\nhttps://etherscan.io/tx/<txHash>\nhttps://opensea.io/assets/0xf07468ead8cf26c752c676e43c814fee9c8cf402/<tokenId>\nhttps://looksrare.org/collections/0xf07468ead8cf26c752c676e43c814fee9c8cf402/<tokenId>\n',
   bidMessageDiscord: '🚨 Cryptophunks #<tokenId> received a bid for 💰 <ethPrice> (<fiatPrice>)\n\nfrom: <from>\n\nhttps://etherscan.io/tx/<txHash>\nhttps://opensea.io/assets/0xf07468ead8cf26c752c676e43c814fee9c8cf402/<tokenId>\nhttps://looksrare.org/collections/0xf07468ead8cf26c752c676e43c814fee9c8cf402/<tokenId>\n',
