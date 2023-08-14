@@ -28,6 +28,30 @@ describe('Erc721SalesService', () => {
     expect(service).toBeDefined()
   });
 
+  it('0x28b859639993604a9b6c060deddede3e63c396134640cd03a6373fdc6bb8a6eb - single bid on blurio', async () => {
+    await delay(COOLDOWN_BETWEEN_TESTS)
+    const provider = service.getWeb3Provider()
+    config.contract_address = '0xf07468eAd8cf26c752C676E43C814FEe9c8CF402'
+    const tokenContract = new ethers.Contract('0xf07468eAd8cf26c752C676E43C814FEe9c8CF402', erc721abi, provider);
+    let filter = tokenContract.filters.Transfer();
+    const startingBlock = 17911072    
+    const events = await tokenContract.queryFilter(filter, 
+      startingBlock, 
+      startingBlock+1)
+    const results = await Promise.all(events.map(async (e) => await service.getTransactionDetails(e)))
+    //expect(results[0].alternateValue).toBe(0.31)
+    let logs = ''
+    results.forEach(r => {
+      logs += `${r.tokenId} sold for ${r.alternateValue}\n`
+    })
+
+    for (const event of events) {
+      const result = await service.getTransactionDetails(event)
+      expect(result.alternateValue).toBe(0.41)
+    }
+    console.log(logs)
+  })
+
   it('ens containing emoji - 0x18188c3b089f4cb106a2989afeda2bd09065d2198b2910f5897ab9aa2282e1ee', async () => {
     await delay(COOLDOWN_BETWEEN_TESTS)
     const provider = service.getWeb3Provider()

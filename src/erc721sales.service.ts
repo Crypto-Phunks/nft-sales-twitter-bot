@@ -265,7 +265,8 @@ export class Erc721SalesService extends BaseService {
       } else if (BLUR_IO_SALES.length) {
         const weiValue = BLUR_IO_SALES.reduce((previous,current) => previous + current, BigInt(0));
         const count = receipt.logs
-          .filter(l => l.address.toLowerCase() === config.contract_address.toLowerCase()).length
+          .filter(l => l.address.toLowerCase() === config.contract_address.toLowerCase() && 
+            l.topics[0].toLowerCase() === '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef').length
         const value = ethers.formatEther(weiValue/BigInt(count));
 
         alternateValue = parseFloat(value);

@@ -49,8 +49,11 @@ async function bootstrap() {
   })
   console.log(logs)
 
-  // await service.discord(results[0], 'aa')
-  await service.dispatch(results[0])
+  if (!args.dryRun || args.dryRun !== 'true')
+    for (let r of results)
+      await service.dispatch(r)
+  else
+    console.log('not dispatching event ')
 
   console.log('shuting down')
 
