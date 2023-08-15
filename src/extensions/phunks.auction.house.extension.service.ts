@@ -22,7 +22,7 @@ export class PhunksAuctionHouseService extends BaseService {
     let filter = tokenContract.filters.AuctionSettled();
     tokenContract.on(filter, (async (event) => {
       const { phunkId, winner, amount, auctionId } =  ( event as any).args
-      const imageUrl = `${config.local_auction_image_path}${phunkId}.png`;
+      const imageUrl = `${config.local_auction_image_path}${phunkId.padStart(4, '0')}.png`;
       const value = ethers.formatEther(amount)
       // If ens is configured, get ens addresses
       let ensTo: string;
