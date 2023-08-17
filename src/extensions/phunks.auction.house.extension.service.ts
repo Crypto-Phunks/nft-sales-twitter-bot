@@ -29,7 +29,16 @@ export class PhunksAuctionHouseService extends BaseService {
       if (config.ens) {
         ensTo = await this.provider.lookupAddress(`${winner}`);
       }      
+      const block = await this.provider.getBlock(event.tx.blockNumber)
+      const transactionDate = block.date.toISOString()
+
       const request:TweetRequest = {
+        logIndex: event.index,
+        eventType: 'sale',
+        platform: 'auctionhouse',
+        transactionDate,
+        initialFrom: '0x0e7f7d8007c0fccac2a813a25f205b9030697856',
+        initialTo: winner,
         from: this.shortenAddress('0x0e7f7d8007c0fccac2a813a25f205b9030697856'),
         tokenId: phunkId,
         to: ensTo ?? this.shortenAddress(winner),
@@ -57,7 +66,16 @@ export class PhunksAuctionHouseService extends BaseService {
         if (config.ens) {
           ensTo = await this.provider.lookupAddress(`${winner}`);
         }      
+        
+        const block = await this.provider.getBlock(event.blockNumber)
+        const transactionDate = block.date.toISOString()
         const request:TweetRequest = {
+          logIndex: event.index,
+          eventType: 'sale',
+          transactionDate,
+          initialFrom: '0x0e7f7d8007c0fccac2a813a25f205b9030697856',
+          initialTo: winner,
+          platform: 'auctionhouse',
           from: this.shortenAddress('0x0e7f7d8007c0fccac2a813a25f205b9030697856'),
           tokenId: phunkId,
           to: ensTo ?? this.shortenAddress(winner),

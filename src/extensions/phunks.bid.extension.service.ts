@@ -33,7 +33,15 @@ export class PhunksBidService extends BaseService {
       if (config.ens) {
         ensFrom = await this.provider.lookupAddress(`${from}`);
       }      
+      const block = await this.provider.getBlock(event.tx.blockNumber)
+      const transactionDate = block.date.toISOString()
+
       const request:TweetRequest = {
+        logIndex: event.index,
+        eventType: 'bid',
+        platform: 'notlarvalabs',
+        initialFrom: from,
+        transactionDate,
         from: ensFrom ?? this.shortenAddress(from),
         tokenId: token,
         ether: parseFloat(value),
