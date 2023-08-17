@@ -1,4 +1,7 @@
 import { Injectable } from '@nestjs/common';
+import { format } from 'date-fns';
+import { Chart as ChartJS, ChartConfiguration, ChartComponentLike } from 'chart.js';
+import { ChartJSNodeCanvas, ChartCallback } from 'chartjs-node-canvas'
 import erc721abi from '../abi/erc721.json'
 import { HttpService } from '@nestjs/axios';
 import { BaseService } from '../base.service';
@@ -45,7 +48,7 @@ export class StatisticsService extends BaseService {
       .setDescription('Get statistics about a wallet')
       .addStringOption(option =>
         option.setName('wallet')
-          .setDescription('Wallet address or ENS name')
+          .setDescription('Wallet address or ENS name (leave empty to ignore this filter)')
           .setRequired(true));
     
     const ownedTokens = new SlashCommandBuilder()
@@ -80,11 +83,19 @@ export class StatisticsService extends BaseService {
           })
           .setRequired(true));
 
+    const graphStats = new SlashCommandBuilder()
+      .setName('graph')
+      .setDescription('Generate graph')
+      .addStringOption(option =>
+        option.setName('wallet')
+          .setDescription('Restrict to the given wallet')
+      )
+
     const guildIds = config.discord_guild_ids.split(',')
     guildIds.forEach(async (guildId) => {
       await rest.put(
         Routes.applicationGuildCommands(config.discord_client_id, guildId),
-        { body: [userStats.toJSON(), volumeStats.toJSON(), ownedTokens.toJSON()] },
+        { body: [userStats.toJSON(), volumeStats.toJSON(), graphStats.toJSON(), ownedTokens.toJSON()] },
       );    
     })
 
@@ -118,7 +129,27 @@ export class StatisticsService extends BaseService {
 
           await interaction.editReply(template);
 
-        } else if ('wallet' === interaction.commandName) {
+        } else if ('graph' === interaction.commandName) {
+          await interaction.deferReply()
+          const wallet = interaction.options.get('wallet')?.value.toString()
+          let lookupWallet = wallet
+          if (lookupWallet && !lookupWallet.startsWith('0x')) {
+            // try to find the matching wallet
+            const address = await this.provider.resolveName(`${wallet}`);
+            if (address) lookupWallet = address
+          }
+          let ensisedWallet = wallet          
+          const lastEvent = await this.lastEvent()
+          let template = config.graphStatisticsMessageDiscord
+          template = template.replace(new RegExp('<last_event>', 'g'), lastEvent.last_event);
+          template = template.replace(new RegExp('<wallet>', 'g'), ensisedWallet ?? 'all');
+
+          const buffer = await this.generateChart(lookupWallet)
+          await interaction.editReply({
+            content: template,
+            files: [buffer]
+          });
+        } else if ('wallet' === interaction.commandName) {          
           await interaction.deferReply()
           const wallet = interaction.options.get('wallet').value.toString()
           let lookupWallet = wallet
@@ -206,6 +237,23 @@ getOwnedTokens(wallet:string) {
       where tx_date > ${option}
       group by platform`
     const result = this.db.prepare(sql).all()
+    return result
+  }
+
+  async volumeChartData(wallet:string) {
+    let sql = `select 
+      date(tx_date) date, 
+      sum(amount) volume, 
+      avg(amount) average_price, 
+      count(*) sales
+      from events ev
+      where platform <> 'looksrare' 
+      <additional_where>
+      group by date(tx_date)
+      order by date(tx_date)`   
+    sql = sql.replace(new RegExp('<additional_where>', 'g'), wallet ? 'AND (lower(from_wallet) = lower(@wallet) OR lower(to_wallet) = lower(@wallet))' : '');
+    const params = wallet ? {wallet} : {}
+    const result = this.db.prepare(sql).all(params)
     return result
   }
 
@@ -341,8 +389,133 @@ getOwnedTokens(wallet:string) {
     }
   }
 
+  async generateChart(wallet:string) {
+    let datas = await this.volumeChartData(wallet)
+    const dataMap = new Map();
+    datas.forEach(d => dataMap.set(d.date, d))
+    const dates = getDates(datas[0].date, datas[datas.length-1].date)
+    datas = dates.map(d => {
+      return {
+        date: d,
+        volume: dataMap.get(d)?.volume ?? 0,
+        average_price: dataMap.get(d)?.average_price ?? 0
+      }
+    })
+    const MAX_BARS = 300
+    if (datas.length > MAX_BARS) {
+      const packSize = Math.floor(datas.length/MAX_BARS)
+      let count = 0
+      let current = {
+        volume: 0,
+        average_price: 0,
+      }
+      datas = datas.reduce((previous, next) => {
+        count++
+        current['volume'] += next.volume
+        current['average_price'] += next.average_price
+        if (count > packSize) {
+          current['date'] = next.date
+          count = 0
+          current = {
+            volume: 0,
+            average_price: 0,
+          }
+          previous.push(current)
+        }
+        return previous        
+      }, [])
+    }
+    const width = 1200;
+    const height = 600;
+    const datasets:any[] = [{
+      label: 'Volume (Ξ)',
+      data: datas.map(d => d.volume),
+      backgroundColor: [
+        '#6A8493',
+      ],
+      borderColor: [
+        '#6A8493',
+      ],
+      borderWidth: 1,
+      yAxisID: 'y1',
+    }, {
+      type: 'line',
+      label: 'Average price (Ξ)',
+      data: datas.map(d => d.average_price),
+      backgroundColor: [
+        '#EB37B0'
+      ],
+      borderColor: [
+        '#EB37B0'
+      ],
+      borderWidth: 2,
+      yAxisID: 'y',
+    }]
+    const configuration:ChartConfiguration = {
+      type: 'bar',
+      data: {
+        labels: datas.map(d => d.date),
+        datasets
+      },
+      options: {
+        elements: {
+          point: {
+              radius: 0
+          }
+        },
+        scales: {
+          y: {
+              type: 'linear',
+              display: true,
+              position: 'left',
+          },
+          y1: {
+              type: 'linear',
+              display: true,
+              position: 'right',
+              grid: {
+                  drawOnChartArea: false,
+              },
+          },
+        } 
+      },
+      plugins: [{
+        id: 'background-colour',
+        beforeDraw: (chart) => {
+          const ctx = chart.ctx;
+          ctx.save();
+          ctx.fillStyle = '#1D1E1F';
+          ctx.fillRect(0, 0, width, height);
+          ctx.restore();
+        }
+      }]
+    };
+    const chartCallback: ChartCallback = (ChartJS) => {
+      ChartJS.defaults.responsive = true;
+      ChartJS.defaults.maintainAspectRatio = false;
+    };
+    const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height, chartCallback });
+    const buffer = await chartJSNodeCanvas.renderToBuffer(configuration);
+    return buffer
+  }
+
 }
 
 function delay(ms: number) {
   return new Promise( resolve => setTimeout(resolve, ms) );
+}
+function addDays(dateIn, days) {
+  var date = new Date(dateIn);
+  date.setDate(date.getDate() + days);
+  return date;
+}
+
+function getDates(startDate, stopDate) {
+  var dateArray = [];
+  var currentDate = startDate;
+  while (currentDate <= stopDate) {
+      dateArray.push(format(new Date (currentDate), 'yyyy-MM-dd'));
+      currentDate = format(addDays(currentDate, 1), 'yyyy-MM-dd');
+  }
+  return dateArray;
 }
