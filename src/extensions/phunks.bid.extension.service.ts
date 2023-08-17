@@ -33,7 +33,7 @@ export class PhunksBidService extends BaseService {
       if (config.ens) {
         ensFrom = await this.provider.lookupAddress(`${from}`);
       }      
-      const block = await this.provider.getBlock(event.tx.blockNumber)
+      const block = await this.provider.getBlock(event.blockNumber)
       const transactionDate = block.date.toISOString()
 
       const request:TweetRequest = {
@@ -53,10 +53,11 @@ export class PhunksBidService extends BaseService {
       await this.discord(request, tweet.id, config.bidMessageDiscord);
     }))
 
-    /*
+    // uncomment this to test the plugin
+    return
     tokenContract.queryFilter(filter, 
-      15097563, 
-      15097563).then(async (events:any) => {
+      17936542, 
+      17936542).then(async (events:any) => {
       for (const event of events) {
         if (event?.args.length < 3) return
         const from = event?.args[2];
@@ -67,8 +68,16 @@ export class PhunksBidService extends BaseService {
         }
         const value = ethers.formatEther(event.args.value);
         const imageUrl = `${config.local_bids_image_path}${event.args.phunkIndex}.png`;
+        const block = await this.provider.getBlock(event.blockNumber)
+        const transactionDate = block.date.toISOString()
+  
         const request:TweetRequest = {
-          from: ensFrom ?? from,
+          logIndex: event.index,
+          eventType: 'bid',
+          platform: 'notlarvalabs',
+          initialFrom: from,
+          transactionDate,
+          from: ensFrom ?? this.shortenAddress(from),
           tokenId: event.args.phunkIndex,
           ether: parseFloat(value),
           transactionHash: event.transactionHash,
@@ -79,7 +88,7 @@ export class PhunksBidService extends BaseService {
         await this.discord(request, tweet.id, config.bidMessageDiscord);
       }
     });
-    */
+    
   }
 
 }
