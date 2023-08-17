@@ -401,7 +401,7 @@ getOwnedTokens(wallet:string) {
         average_price: dataMap.get(d)?.average_price ?? 0
       }
     })
-    const MAX_BARS = 300
+    const MAX_BARS = 250
     if (datas.length > MAX_BARS) {
       const packSize = Math.floor(datas.length/MAX_BARS)
       let count = 0
@@ -427,7 +427,8 @@ getOwnedTokens(wallet:string) {
     }
     const width = 1200;
     const height = 600;
-    const datasets:any[] = [{
+    const datasets:any[] = [
+    {
       label: 'Volume (Ξ)',
       data: datas.map(d => d.volume),
       backgroundColor: [
@@ -438,19 +439,22 @@ getOwnedTokens(wallet:string) {
       ],
       borderWidth: 1,
       yAxisID: 'y1',
-    }, {
-      type: 'line',
-      label: 'Average price (Ξ)',
-      data: datas.map(d => d.average_price),
-      backgroundColor: [
-        '#EB37B0'
-      ],
-      borderColor: [
-        '#EB37B0'
-      ],
-      borderWidth: 2,
-      yAxisID: 'y',
     }]
+    if (!wallet) {
+      datasets.push({
+        type: 'line',
+        label: 'Average price (Ξ)',
+        data: datas.map(d => d.average_price),
+        backgroundColor: [
+          '#EB37B0'
+        ],
+        borderColor: [
+          '#EB37B0'
+        ],
+        borderWidth: 1,
+        yAxisID: 'y',
+      })      
+    }
     const configuration:ChartConfiguration = {
       type: 'bar',
       data: {
@@ -468,6 +472,10 @@ getOwnedTokens(wallet:string) {
               type: 'linear',
               display: true,
               position: 'left',
+              grid: {
+                color: (ctx) => (ctx.tick.value === 0 ? '#6A8493' : 'transparent'),
+                drawTicks: false,
+              }
           },
           y1: {
               type: 'linear',
