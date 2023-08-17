@@ -57,6 +57,18 @@ You can add a link to the tweet that's been generated in the discord message usi
 
 To setup the bot, lead to https://discord.com/developers and create an application and a bot, then invite the bot you just created using the following link: https://discord.com/api/oauth2/authorize?client_id=[yourDiscordAppclientId]&permissions=2048&scope=bot%20applications.commands, then ensure that the invited bot is allowed to access the channel ID you want your bot to post into.
 
+## Statistics module
+
+You can enable the optional statistics module in the `AppModule` definition file `app.module.ts`. When
+enabled, it will index the blockchain for the specified contract in the configuration, starting at 
+block `statistic_initial_block`. Once indexed, the discord bot will reply to the following commands: 
+
+- `/owned <wallet>` will display a list of the owned tokens by a wallet.
+- `/wallet <wallet>` will display some statistics for a given wallet (owned token, days since the first owned tokens, total volume of transaction)
+- `/volume <window>` will display a volume of transactions per marketplace.
+
+The message templates for each command can be customized through the configuration file.
+
 ## CLI mode
 
 You can use this app as a standalone cli using the following command line along with the `block` and `tx` parameter. The optional `contract` parameter can be used to override the contract from the configuration. ie:

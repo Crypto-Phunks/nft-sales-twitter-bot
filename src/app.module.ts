@@ -22,7 +22,7 @@ import { PhunksAuctionHouseService } from './extensions/phunks.auction.house.ext
     // PhunksBidService,
     // PhunksAuctionHouseService,
     // PhunksAuctionFlywheelService, 
-    StatisticsService
+    // StatisticsService
   ],
 })
 
