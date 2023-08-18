@@ -64,7 +64,7 @@ export class StatisticsService extends BaseService {
       .setDescription('Get volume statistics')
       .addStringOption(option =>
         option.setName('window')
-          .setDescription('Time window')
+          .setDescription('Time window')          
           .setChoices({
             name: '24 hours',
             value: '24h'
@@ -83,6 +83,34 @@ export class StatisticsService extends BaseService {
           })
           .setRequired(true));
 
+    const topTraders = new SlashCommandBuilder()
+      .setName('traders')
+      .setDescription('Get top traders for a given period')
+      .addStringOption(option =>
+        option.setName('window')
+          .setDescription('Time window')
+
+          .setChoices({
+            name: '24 hours',
+            value: '1 day'
+          }, {
+            name: '7 days',
+            value: '7 days'
+          }, {
+            name: '1 month',
+            value: '1 month'
+          }, {
+            name: '1 year',
+            value: '1 year'
+          }, {
+            name: 'All times',
+            value: '300 years'
+          })
+          .setRequired(true))
+      .addStringOption(option =>
+        option.setName('wallet')
+          .setDescription('Force inclusion of the given wallet (optional)'));
+
     const graphStats = new SlashCommandBuilder()
       .setName('graph')
       .setDescription('Generate graph')
@@ -95,16 +123,27 @@ export class StatisticsService extends BaseService {
     guildIds.forEach(async (guildId) => {
       await rest.put(
         Routes.applicationGuildCommands(config.discord_client_id, guildId),
-        { body: [userStats.toJSON(), volumeStats.toJSON(), graphStats.toJSON(), ownedTokens.toJSON()] },
+        { body: [userStats.toJSON(), topTraders.toJSON(), volumeStats.toJSON(), graphStats.toJSON(), ownedTokens.toJSON()] },
       );    
     })
 
     this.discordClient.client.on('interactionCreate', async (interaction) => {
       try {
         if (!interaction.isCommand()) return;
-        if ('owned' === interaction.commandName) {
+        if ('traders' === interaction.commandName) {
           await interaction.deferReply()
-          const wallet = interaction.options.get('wallet').value.toString()
+          const wallet = interaction.options.get('wallet')?.value?.toString()
+          const window = interaction.options.get('window').value.toString()
+          const result = await this.getTopTraders(wallet, window)
+          let template = `Top traders over (${window}): \`\`\`\n\n`
+          for (let r of result) {
+            template += `${r.rank.toString().padStart(5, ' ')}  ${r.wallet.padEnd(45, ' ')}  ${('Ξ'+(Math.floor(r.volume*100)/100).toFixed(2)).padStart(10, ' ')}\n`
+          }
+          template += `\`\`\`\n`
+          interaction.editReply(template)
+        } else if ('owned' === interaction.commandName) {
+          await interaction.deferReply()
+          const wallet = interaction.options.get('wallet').name.toString()
           let lookupWallet = wallet
           if (!lookupWallet.startsWith('0x')) {
             // try to find the matching wallet
@@ -312,6 +351,18 @@ getOwnedTokens(wallet:string) {
         PRIMARY KEY (key)
       );`,
     ).run();
+    this.db.prepare(
+      `CREATE INDEX IF NOT EXISTS idx_date ON events(tx_date)`,
+    ).run();
+    this.db.prepare(
+      `CREATE INDEX IF NOT EXISTS idx_token_date ON events(token_id, tx_date)`,
+    ).run();
+    this.db.prepare(
+      `CREATE INDEX IF NOT EXISTS idx_towallet_date ON events(to_wallet, tx_date)`,
+    ).run();
+    this.db.prepare(
+      `CREATE INDEX IF NOT EXISTS idx_fromwallet_date ON events(from_wallet, tx_date)`,
+    ).run();
     
     this.prepareStatements();
 
@@ -387,6 +438,49 @@ getOwnedTokens(wallet:string) {
       }  
       i += 10
     }
+  }
+
+  async getTopTraders(wallet:string, period:string) {
+    
+    if (!wallet.startsWith('0x')) {
+      // try to find the matching wallet
+      const address = await this.provider.resolveName(`${wallet}`);
+      if (address) wallet = address
+    }
+
+    const sql = `with test as (
+      select wallet, sum(volume) volume, 
+      rank() over (order by sum(volume) desc) rank
+      from (
+        select to_wallet wallet, sum(amount) volume
+        from events e
+        where tx_date > date(date(), '-${period}')
+        group by 1
+        union 
+        select from_wallet wallet, sum(amount) volume
+        from events e
+        where tx_date > date(date(), '-${period}')
+        group by 1
+      ) a 
+      group by 1
+      order by 2 desc
+    ) 
+    select distinct * from (
+      (select * from test limit 20)
+    )
+    union 
+    select * from (
+      select * from test 
+      where wallet = '${wallet}'
+    ) order by 3
+    `
+    const result = this.db.prepare(sql).all({wallet})
+    for (let r of result) {
+      const address = await this.provider.lookupAddress(`${r.wallet}`);
+      if (address) r.wallet = address
+    }
+    
+    return result
   }
 
   async generateChart(wallet:string) {
