@@ -175,7 +175,7 @@ export class StatisticsService extends BaseService {
           const imageWidth = imagesPerLine*oneImageWidth
           const canvas = createCanvas(imagesPerLine*oneImageWidth, linesCount*oneImageWidth)
           const context = canvas.getContext('2d')
-
+          context.imageSmoothingEnabled = false
           let x = 0, y = 0
           for (let token of tokens) {
             const imageUrl = `${config.local_image_path}${token.token_id.toString().padStart(4, '0')}.png`
