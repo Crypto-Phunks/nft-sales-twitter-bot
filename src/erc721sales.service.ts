@@ -71,340 +71,346 @@ export class Erc721SalesService extends BaseService {
     // if (tx.transactionHash !== '0xcee5c725e2234fd0704e1408cdf7f71d881e67f8bf5d6696a98fdd7c0bcf52f3') return;
     
     let tokenId: string;
+    let retryCount: number = 0
 
-    try {
+    while (true) {
+      try {
 
-      // Get addresses of seller / buyer from topics
-      const coder = AbiCoder.defaultAbiCoder()
-      let from = coder.decode(['address'], tx?.topics[1])[0];
-      let to = coder.decode(['address'], tx?.topics[2])[0];
-      
-      // ignore internal transfers to contract, another transfer event will handle this 
-      // transaction afterward (the one that'll go to the buyer wallet)
-      const code = await this.provider.getCode(to)
-      /*
-       we need this for stats
-      if (code !== '0x') {
-        console.log(`contract detected for ${tx.transactionHash} event index ${tx.index}`)
-        return
-      }
-      */
-
-      // not an erc721 transfer
-      if (!tx?.topics[3]) return
-
-      // Get tokenId from topics
-      tokenId = hexToNumberString(tx?.topics[3]);
-
-      // Get transaction hash
-      const { transactionHash } = tx;
-      const time = new Date().getTime()
-      const isMint = BigInt(from) === BigInt(0);
-
-      // Get transaction
-      const transaction = await this.provider.getTransaction(transactionHash);
-      const block = await this.provider.getBlock(transaction.blockNumber)
-      const transactionDate = block.date.toISOString()      
-      console.log(`handling ${transactionHash} log ${tx.index} — ${transactionDate}`)
-      
-      const { value } = transaction;
-      let ether = ethers.formatEther(value.toString());
-
-      // Get transaction receipt
-      const receipt: TransactionReceipt = await this.provider.getTransactionReceipt(transactionHash);
-
-      // Get token image
-      const imageUrl = config.use_local_images 
-        ? `${config.local_image_path}${tokenId.padStart(4, '0')}.png`
-        : await this.getTokenMetadata(tokenId);
-
-      // Check if LooksRare & parse the event & get the value
-      let alternateValue = 0;
-      const LR = receipt.logs.map((log: any) => {
-        if (log.address.toLowerCase() === looksRareContractAddress.toLowerCase()) {  
-          return looksInterface.parseLog(log);
-        }
-      }).filter((log: any) => (log?.name === 'TakerAsk' || log?.name === 'TakerBid') &&
-        log?.args.tokenId == tokenId);
-      
-      const LRV2 = receipt.logs.map((log: any) => {
-        if (log.address.toLowerCase() === looksRareContractAddressV2.toLowerCase()) {  
-          return looksInterfaceV2.parseLog(log);
-        }
-      })
-      .filter(log => log !== undefined)
-      .filter((log: any) => {
-        return (log?.name === 'TakerAsk' || log?.name === 'TakerBid') &&
-        log?.args.itemIds.map(i => i.toString()).indexOf(tokenId) > -1
-      });
-      
-      const NFTX = receipt.logs.map((log: any) => {
-        // direct buy from vault
-        if (log.topics[0].toLowerCase() === '0x1cdb5ee3c47e1a706ac452b89698e5e3f2ff4f835ca72dde8936d0f4fcf37d81') {  
-          const relevantData = log.data.substring(2);
-          const relevantDataSlice = relevantData.match(/.{1,64}/g);
-          return BigInt(`0x${relevantDataSlice[1]}`) / BigInt('1000000000000000');
-        } else if (log.topics[0].toLowerCase() === '0x63b13f6307f284441e029836b0c22eb91eb62a7ad555670061157930ce884f4e') {
-          const parsedLog = nftxInterface.parseLog(log)
-          
-          // check that the current transfer is NFTX related
-          if (!parsedLog.args.nftIds.filter(n => BigInt(n).toString() === tokenId).length) {
-            return
-          }
-          
-          // redeem, find corresponding token bought
-          const swaps = receipt.logs.filter((log2: any) => log2.topics[0].toLowerCase() === '0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822')
-            .map(b => {
-              const relevantData = b.data.substring(2);
-              const relevantDataSlice = relevantData.match(/.{1,64}/g);
-              const moneyIn = BigInt(`0x${relevantDataSlice[0]}`)
-              if (moneyIn > BigInt(0))
-                return moneyIn / BigInt('1000000000000000');
-              else return BigInt('0')
-            })
-          if (swaps.length) return swaps.reduce((previous, current) => previous + current, BigInt(0))
-        }
-      }).filter(n => n !== undefined)
-
-      // Check all marketplaces specific events to find an alternate price
-      // in case of sweep, multiple buy, or bid
-      const NLL = receipt.logs.map((log: any) => {
-        if (log.topics[0].toLowerCase() === '0x975c7be5322a86cddffed1e3e0e55471a764ac2764d25176ceb8e17feef9392c') {
-          const relevantData = log.data.substring(2);
-          if (tokenId !== parseInt(log.topics[1], 16).toString()) {
-            return
-          }
-          return BigInt(`0x${relevantData}`) / BigInt('1000000000000000')
-        }
-      }).filter(n => n !== undefined)
-
-      const CARGO = receipt.logs.map((log: any) => {
-        if (log.topics[0] === cargoTopicIdentifier) {
-          // cargo sale
-          const data = log.data.substring(2);
-          const dataSlices = data.match(/.{1,64}/g);
-          const amount = BigInt(`0x${dataSlices[15]}`);
-          const saleTokenId = `${parseInt(dataSlices[10], 16)}`;
-          const commission = BigInt(`0x${dataSlices[16]}`)
-
-          if (saleTokenId === tokenId)
-            return amount + commission
-        }
-        return undefined
-      }).filter(r => r !== undefined)
-
-      const RARIBLE = receipt.logs.map((log: any) => {
-        if (log.topics[0] === raribleTopicIdentifier ) {
-          const nftData = log.data.substring(2);
-          const nftDataSlices = nftData.match(/.{1,64}/g);
-
-          if (nftDataSlices.length !== 16) {
-            // invalid slice
-            return undefined
-          }
-          
-          if (BigInt(`0x${nftDataSlices[12]}`).toString() !== tokenId) return;
-
-          // rarible sale
-          return BigInt(`0x${nftDataSlices[4]}`);
-        }
-        return undefined
-      }).filter(r => r !== undefined)
-
-      const X2Y2 = receipt.logs.map((log: any, index:number) => {
-        if (log.topics[0].toLowerCase() === '0x3cbb63f144840e5b1b0a38a7c19211d2e89de4d7c5faf8b2d3c1776c302d1d33') {
-          const data = log.data.substring(2);
-          const dataSlices = data.match(/.{1,64}/g);
-          // find the right token
-          if (BigInt(`0x${dataSlices[18]}`).toString() !== tokenId) return;
-          let amount = BigInt(`0x${dataSlices[12]}`) / BigInt('1000000000000000');
-          if (amount === BigInt(0)) {
-            amount = BigInt(`0x${dataSlices[26]}`) / BigInt('1000000000000000');
-          }
-          return amount
-        }
-      }).filter(n => n !== undefined)  
-
-      const BLUR_IO = receipt.logs.map((log: any) => {
-        if (log.address.toLowerCase() === blurContractAddress.toLowerCase()) {  
-          return blurInterface.parseLog(log);
-        }
-      }).filter(l => l?.name === 'OrdersMatched' && l?.args.buy.tokenId.toString() === tokenId)
-
-      const BLUR_IO_SALES = receipt.logs
-        .filter(l => l.address.toLowerCase() === blurBiddingContractAddress.toLowerCase())
-        .filter(l => {
-          // find payment to blur
-          const address = AbiCoder.defaultAbiCoder().decode(['address'], l?.topics[2])[0].toLowerCase()
-          return address === blurSalesContractAddressV3.toLowerCase() || address === blurSalesContractAddressV2.toLowerCase()
-        })
-        .map(l => {
-          const relevantData = l.data.substring(2);
-          const relevantDataSlice = relevantData.match(/.{1,64}/g);
-          const amount = BigInt(`0x${relevantDataSlice[0]}`)
-
-          return amount
-        })
-      
-      // if that's not a sales but use blur contract address, it's a sweep
-      const BLUR_IO_SWEEP = BLUR_IO_SALES.length || 
-        (transaction.to.toLowerCase() != blurSalesContractAddressV3.toLowerCase() && 
-        transaction.to.toLowerCase() != blurSalesContractAddressV2.toLowerCase() && 
-        transaction.to.toLowerCase() != blurMarketplaceAddress.toLowerCase()) ? [] :
-        receipt.logs.filter(l => l.address.toLowerCase() === blurSalesContractAddressV3.toLowerCase() ||
-          l.address.toLowerCase() === blurSalesContractAddressV2.toLowerCase())
-      
-      const OPENSEA_SEAPORT = receipt.logs.map((log: any) => {
-        if (log.topics[0].toLowerCase() === '0x9d9af8e38d66c62e2c12f0225249fd9d721c54b83f48d9352c97c6cacdcb6f31') {
-          const logDescription = seaportInterface.parseLog(log);
-          const matchingOffers = logDescription.args.offer.filter(
-            o => o.identifier.toString() === tokenId || 
-            o.identifier.toString() === '0');
-          const tokenCount = logDescription.args.offer.length;
-          
-          if (matchingOffers.length === 0) {
-            return
-          }
-          let amounts = logDescription.args.consideration.map(c => BigInt(c.amount))
-          // add weth
-          const wethOffers = matchingOffers.map(o => o.token === '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2' && o.amount > 0 ? BigInt(o.amount) : BigInt(0));
-          if (wethOffers.length > 0 && wethOffers[0] != BigInt(0)) {
-            console.log('found weth offer, using it as amount')
-            amounts = wethOffers
-          }
-          console.log(amounts)
-          const amount = amounts.reduce((previous,current) => previous + current, BigInt(0))
-          return amount / BigInt('1000000000000000') / BigInt(tokenCount)
-        }
-      }).filter(n => n !== undefined)      
-
-      let platform:string = 'unknown'
-      if (LR.length) {
-        platform = 'looksrare'
-        const weiValue = (LR[0]?.args?.price)?.toString();
-        const value = ethers.formatEther(weiValue);
-        alternateValue = parseFloat(value);
-      } else if (LRV2.length) {
-        platform = 'looksrare'
-        const weiValue = (LRV2[0]?.args?.feeAmounts[0])?.toString();
-        const value = ethers.formatEther(weiValue);
-        alternateValue = parseFloat(value);
-      } else if (NFTX.length) {
-        platform = 'nftx'
-        // find the number of token transferred to adjust amount per token
-        const redeemLog = receipt.logs.filter((log: any) => log.topics[0].toLowerCase() === '0x63b13f6307f284441e029836b0c22eb91eb62a7ad555670061157930ce884f4e')[0] as any
-        let tokenCount = 1
-        if (redeemLog) {
-          const parsedLog = nftxInterface.parseLog(redeemLog)
-          tokenCount = Math.max(parsedLog.args.nftIds.length, 1)
-        }
-        alternateValue = parseFloat(NFTX[0].toString())/tokenCount/1000;
-      } else if (NLL.length) {
-        platform = 'notlarvalabs'
-        alternateValue = parseFloat(NLL[0].toString())/1000;
-      } else if (X2Y2.length) {
-        platform = 'x2y2'
-        alternateValue = parseFloat(X2Y2[0].toString())/1000;
-      } else if (OPENSEA_SEAPORT.length) {
-        platform = 'opensea'
-        alternateValue = parseFloat(OPENSEA_SEAPORT[0].toString())/1000;
-      } else if (BLUR_IO.length) {
-        platform = 'blurio'
-        const weiValue = (BLUR_IO[0]?.args?.buy.price)?.toString();
-        const value = ethers.formatEther(weiValue);
-        alternateValue = parseFloat(value);
-      } else if (BLUR_IO_SALES.length) {
-        platform = 'blurio'
-        const weiValue = BLUR_IO_SALES.reduce((previous,current) => previous + current, BigInt(0));
-        const count = receipt.logs
-          .filter(l => l.address.toLowerCase() === config.contract_address.toLowerCase() && 
-            l.topics[0].toLowerCase() === '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef').length
-        const value = ethers.formatEther(weiValue/BigInt(count));
-
-        alternateValue = parseFloat(value);
-      } else if (BLUR_IO_SWEEP.length) {
-        platform = 'blurio'
-        // if we're here, we weren't able to get the exact price, determinate it 
-        // using the overall price and the ether spent in tx
-        // the only way to get an accurate result would be to run an EVM to track
-        // internal txs
-        const count = receipt.logs
-          .filter(l => l.address.toLowerCase() === config.contract_address.toLowerCase() && 
-            l.topics[0].toLowerCase() === '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef').length
-
-        // look for blur.io custom ERC20 token if the ether amount is empty
-        if (ether === '0.0') {
-          const l = receipt.logs.filter(l => l.address.toLowerCase() === blurBiddingContractAddress.toLowerCase())
-            .reduce((previous, current) => {
-              const relevantData = current.data.substring(2);
-              const relevantDataSlice = relevantData.match(/.{1,64}/g);
-              const value = BigInt(`0x${relevantDataSlice[0]}`);
-              return previous + value
-            }, BigInt(0))
-          
-          ether = (parseFloat((l / BigInt('10000000000000000')).toString())/100).toString()
-          console.log(ether)
-        }
-        alternateValue = parseFloat(ether)/count
-      } else if (CARGO.length) {
-        platform = 'cargo'
-        alternateValue = (parseFloat((CARGO[0] / BigInt('10000000000000000')).toString())/100)
-      } else if (RARIBLE.length) {
-        platform = 'rarible'
-        const amount = RARIBLE.reduce((previous,current) => previous + current, BigInt(0));
-        alternateValue = (parseFloat((amount / BigInt('10000000000000000')).toString())/100)
-      }
-
-      // if there is an NFTX swap involved, ignore this transfer
-      const swaps = receipt.logs.filter((log2: any) => log2.topics[0].toLowerCase() === '0x7af2bc3f8ec800c569b6555feaf16589d96a9d04a49d1645fd456d75fa0b372b')
-      if (swaps.length) {
-        console.log('nftx swap involved in this transaction')
-        if (ignoreNftxSwaps)
+        // Get addresses of seller / buyer from topics
+        const coder = AbiCoder.defaultAbiCoder()
+        let from = coder.decode(['address'], tx?.topics[1])[0];
+        let to = coder.decode(['address'], tx?.topics[2])[0];
+        
+        // ignore internal transfers to contract, another transfer event will handle this 
+        // transaction afterward (the one that'll go to the buyer wallet)
+        const code = await this.provider.getCode(to)
+        /*
+        we need this for stats
+        if (code !== '0x') {
+          console.log(`contract detected for ${tx.transactionHash} event index ${tx.index}`)
           return
-        else 
+        }
+        */
+
+        // not an erc721 transfer
+        if (!tx?.topics[3]) return
+
+        // Get tokenId from topics
+        tokenId = hexToNumberString(tx?.topics[3]);
+
+        // Get transaction hash
+        const { transactionHash } = tx;
+        const time = new Date().getTime()
+        const isMint = BigInt(from) === BigInt(0);
+
+        // Get transaction
+        const transaction = await this.provider.getTransaction(transactionHash);
+        const block = await this.provider.getBlock(transaction.blockNumber)
+        const transactionDate = block.date.toISOString()      
+        console.log(`handling ${transactionHash} log ${tx.index} — ${transactionDate}`)
+        
+        const { value } = transaction;
+        let ether = ethers.formatEther(value.toString());
+
+        // Get transaction receipt
+        const receipt: TransactionReceipt = await this.provider.getTransactionReceipt(transactionHash);
+
+        // Get token image
+        const imageUrl = config.use_local_images 
+          ? `${config.local_image_path}${tokenId.padStart(4, '0')}.png`
+          : await this.getTokenMetadata(tokenId);
+
+        // Check if LooksRare & parse the event & get the value
+        let alternateValue = 0;
+        const LR = receipt.logs.map((log: any) => {
+          if (log.address.toLowerCase() === looksRareContractAddress.toLowerCase()) {  
+            return looksInterface.parseLog(log);
+          }
+        }).filter((log: any) => (log?.name === 'TakerAsk' || log?.name === 'TakerBid') &&
+          log?.args.tokenId == tokenId);
+        
+        const LRV2 = receipt.logs.map((log: any) => {
+          if (log.address.toLowerCase() === looksRareContractAddressV2.toLowerCase()) {  
+            return looksInterfaceV2.parseLog(log);
+          }
+        })
+        .filter(log => log !== undefined)
+        .filter((log: any) => {
+          return (log?.name === 'TakerAsk' || log?.name === 'TakerBid') &&
+          log?.args.itemIds.map(i => i.toString()).indexOf(tokenId) > -1
+        });
+        
+        const NFTX = receipt.logs.map((log: any) => {
+          // direct buy from vault
+          if (log.topics[0].toLowerCase() === '0x1cdb5ee3c47e1a706ac452b89698e5e3f2ff4f835ca72dde8936d0f4fcf37d81') {  
+            const relevantData = log.data.substring(2);
+            const relevantDataSlice = relevantData.match(/.{1,64}/g);
+            return BigInt(`0x${relevantDataSlice[1]}`) / BigInt('1000000000000000');
+          } else if (log.topics[0].toLowerCase() === '0x63b13f6307f284441e029836b0c22eb91eb62a7ad555670061157930ce884f4e') {
+            const parsedLog = nftxInterface.parseLog(log)
+            
+            // check that the current transfer is NFTX related
+            if (!parsedLog.args.nftIds.filter(n => BigInt(n).toString() === tokenId).length) {
+              return
+            }
+            
+            // redeem, find corresponding token bought
+            const swaps = receipt.logs.filter((log2: any) => log2.topics[0].toLowerCase() === '0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822')
+              .map(b => {
+                const relevantData = b.data.substring(2);
+                const relevantDataSlice = relevantData.match(/.{1,64}/g);
+                const moneyIn = BigInt(`0x${relevantDataSlice[0]}`)
+                if (moneyIn > BigInt(0))
+                  return moneyIn / BigInt('1000000000000000');
+                else return BigInt('0')
+              })
+            if (swaps.length) return swaps.reduce((previous, current) => previous + current, BigInt(0))
+          }
+        }).filter(n => n !== undefined)
+
+        // Check all marketplaces specific events to find an alternate price
+        // in case of sweep, multiple buy, or bid
+        const NLL = receipt.logs.map((log: any) => {
+          if (log.topics[0].toLowerCase() === '0x975c7be5322a86cddffed1e3e0e55471a764ac2764d25176ceb8e17feef9392c') {
+            const relevantData = log.data.substring(2);
+            if (tokenId !== parseInt(log.topics[1], 16).toString()) {
+              return
+            }
+            return BigInt(`0x${relevantData}`) / BigInt('1000000000000000')
+          }
+        }).filter(n => n !== undefined)
+
+        const CARGO = receipt.logs.map((log: any) => {
+          if (log.topics[0] === cargoTopicIdentifier) {
+            // cargo sale
+            const data = log.data.substring(2);
+            const dataSlices = data.match(/.{1,64}/g);
+            const amount = BigInt(`0x${dataSlices[15]}`);
+            const saleTokenId = `${parseInt(dataSlices[10], 16)}`;
+            const commission = BigInt(`0x${dataSlices[16]}`)
+
+            if (saleTokenId === tokenId)
+              return amount + commission
+          }
+          return undefined
+        }).filter(r => r !== undefined)
+
+        const RARIBLE = receipt.logs.map((log: any) => {
+          if (log.topics[0] === raribleTopicIdentifier ) {
+            const nftData = log.data.substring(2);
+            const nftDataSlices = nftData.match(/.{1,64}/g);
+
+            if (nftDataSlices.length !== 16) {
+              // invalid slice
+              return undefined
+            }
+            
+            if (BigInt(`0x${nftDataSlices[12]}`).toString() !== tokenId) return;
+
+            // rarible sale
+            return BigInt(`0x${nftDataSlices[4]}`);
+          }
+          return undefined
+        }).filter(r => r !== undefined)
+
+        const X2Y2 = receipt.logs.map((log: any, index:number) => {
+          if (log.topics[0].toLowerCase() === '0x3cbb63f144840e5b1b0a38a7c19211d2e89de4d7c5faf8b2d3c1776c302d1d33') {
+            const data = log.data.substring(2);
+            const dataSlices = data.match(/.{1,64}/g);
+            // find the right token
+            if (BigInt(`0x${dataSlices[18]}`).toString() !== tokenId) return;
+            let amount = BigInt(`0x${dataSlices[12]}`) / BigInt('1000000000000000');
+            if (amount === BigInt(0)) {
+              amount = BigInt(`0x${dataSlices[26]}`) / BigInt('1000000000000000');
+            }
+            return amount
+          }
+        }).filter(n => n !== undefined)  
+
+        const BLUR_IO = receipt.logs.map((log: any) => {
+          if (log.address.toLowerCase() === blurContractAddress.toLowerCase()) {  
+            return blurInterface.parseLog(log);
+          }
+        }).filter(l => l?.name === 'OrdersMatched' && l?.args.buy.tokenId.toString() === tokenId)
+
+        const BLUR_IO_SALES = receipt.logs
+          .filter(l => l.address.toLowerCase() === blurBiddingContractAddress.toLowerCase())
+          .filter(l => {
+            // find payment to blur
+            const address = AbiCoder.defaultAbiCoder().decode(['address'], l?.topics[2])[0].toLowerCase()
+            return address === blurSalesContractAddressV3.toLowerCase() || address === blurSalesContractAddressV2.toLowerCase()
+          })
+          .map(l => {
+            const relevantData = l.data.substring(2);
+            const relevantDataSlice = relevantData.match(/.{1,64}/g);
+            const amount = BigInt(`0x${relevantDataSlice[0]}`)
+
+            return amount
+          })
+        
+        // if that's not a sales but use blur contract address, it's a sweep
+        const BLUR_IO_SWEEP = BLUR_IO_SALES.length || 
+          (transaction.to.toLowerCase() != blurSalesContractAddressV3.toLowerCase() && 
+          transaction.to.toLowerCase() != blurSalesContractAddressV2.toLowerCase() && 
+          transaction.to.toLowerCase() != blurMarketplaceAddress.toLowerCase()) ? [] :
+          receipt.logs.filter(l => l.address.toLowerCase() === blurSalesContractAddressV3.toLowerCase() ||
+            l.address.toLowerCase() === blurSalesContractAddressV2.toLowerCase())
+        
+        const OPENSEA_SEAPORT = receipt.logs.map((log: any) => {
+          if (log.topics[0].toLowerCase() === '0x9d9af8e38d66c62e2c12f0225249fd9d721c54b83f48d9352c97c6cacdcb6f31') {
+            const logDescription = seaportInterface.parseLog(log);
+            const matchingOffers = logDescription.args.offer.filter(
+              o => o.identifier.toString() === tokenId || 
+              o.identifier.toString() === '0');
+            const tokenCount = logDescription.args.offer.length;
+            
+            if (matchingOffers.length === 0) {
+              return
+            }
+            let amounts = logDescription.args.consideration.map(c => BigInt(c.amount))
+            // add weth
+            const wethOffers = matchingOffers.map(o => o.token === '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2' && o.amount > 0 ? BigInt(o.amount) : BigInt(0));
+            if (wethOffers.length > 0 && wethOffers[0] != BigInt(0)) {
+              console.log('found weth offer, using it as amount')
+              amounts = wethOffers
+            }
+            console.log(amounts)
+            const amount = amounts.reduce((previous,current) => previous + current, BigInt(0))
+            return amount / BigInt('1000000000000000') / BigInt(tokenCount)
+          }
+        }).filter(n => n !== undefined)      
+
+        let platform:string = 'unknown'
+        if (LR.length) {
+          platform = 'looksrare'
+          const weiValue = (LR[0]?.args?.price)?.toString();
+          const value = ethers.formatEther(weiValue);
+          alternateValue = parseFloat(value);
+        } else if (LRV2.length) {
+          platform = 'looksrare'
+          const weiValue = (LRV2[0]?.args?.feeAmounts[0])?.toString();
+          const value = ethers.formatEther(weiValue);
+          alternateValue = parseFloat(value);
+        } else if (NFTX.length) {
           platform = 'nftx'
+          // find the number of token transferred to adjust amount per token
+          const redeemLog = receipt.logs.filter((log: any) => log.topics[0].toLowerCase() === '0x63b13f6307f284441e029836b0c22eb91eb62a7ad555670061157930ce884f4e')[0] as any
+          let tokenCount = 1
+          if (redeemLog) {
+            const parsedLog = nftxInterface.parseLog(redeemLog)
+            tokenCount = Math.max(parsedLog.args.nftIds.length, 1)
+          }
+          alternateValue = parseFloat(NFTX[0].toString())/tokenCount/1000;
+        } else if (NLL.length) {
+          platform = 'notlarvalabs'
+          alternateValue = parseFloat(NLL[0].toString())/1000;
+        } else if (X2Y2.length) {
+          platform = 'x2y2'
+          alternateValue = parseFloat(X2Y2[0].toString())/1000;
+        } else if (OPENSEA_SEAPORT.length) {
+          platform = 'opensea'
+          alternateValue = parseFloat(OPENSEA_SEAPORT[0].toString())/1000;
+        } else if (BLUR_IO.length) {
+          platform = 'blurio'
+          const weiValue = (BLUR_IO[0]?.args?.buy.price)?.toString();
+          const value = ethers.formatEther(weiValue);
+          alternateValue = parseFloat(value);
+        } else if (BLUR_IO_SALES.length) {
+          platform = 'blurio'
+          const weiValue = BLUR_IO_SALES.reduce((previous,current) => previous + current, BigInt(0));
+          const count = receipt.logs
+            .filter(l => l.address.toLowerCase() === config.contract_address.toLowerCase() && 
+              l.topics[0].toLowerCase() === '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef').length
+          const value = ethers.formatEther(weiValue/BigInt(count));
+
+          alternateValue = parseFloat(value);
+        } else if (BLUR_IO_SWEEP.length) {
+          platform = 'blurio'
+          // if we're here, we weren't able to get the exact price, determinate it 
+          // using the overall price and the ether spent in tx
+          // the only way to get an accurate result would be to run an EVM to track
+          // internal txs
+          const count = receipt.logs
+            .filter(l => l.address.toLowerCase() === config.contract_address.toLowerCase() && 
+              l.topics[0].toLowerCase() === '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef').length
+
+          // look for blur.io custom ERC20 token if the ether amount is empty
+          if (ether === '0.0') {
+            const l = receipt.logs.filter(l => l.address.toLowerCase() === blurBiddingContractAddress.toLowerCase())
+              .reduce((previous, current) => {
+                const relevantData = current.data.substring(2);
+                const relevantDataSlice = relevantData.match(/.{1,64}/g);
+                const value = BigInt(`0x${relevantDataSlice[0]}`);
+                return previous + value
+              }, BigInt(0))
+            
+            ether = (parseFloat((l / BigInt('10000000000000000')).toString())/100).toString()
+            console.log(ether)
+          }
+          alternateValue = parseFloat(ether)/count
+        } else if (CARGO.length) {
+          platform = 'cargo'
+          alternateValue = (parseFloat((CARGO[0] / BigInt('10000000000000000')).toString())/100)
+        } else if (RARIBLE.length) {
+          platform = 'rarible'
+          const amount = RARIBLE.reduce((previous,current) => previous + current, BigInt(0));
+          alternateValue = (parseFloat((amount / BigInt('10000000000000000')).toString())/100)
+        }
+
+        // if there is an NFTX swap involved, ignore this transfer
+        const swaps = receipt.logs.filter((log2: any) => log2.topics[0].toLowerCase() === '0x7af2bc3f8ec800c569b6555feaf16589d96a9d04a49d1645fd456d75fa0b372b')
+        if (swaps.length) {
+          console.log('nftx swap involved in this transaction')
+          if (ignoreNftxSwaps)
+            return
+          else 
+            platform = 'nftx'
+        }
+
+        // If ens is configured, get ens addresses
+        let ensTo: string;
+        let ensFrom: string;
+        if (config.ens && !ignoreENS) {
+          ensTo = await this.provider.lookupAddress(`${to}`);
+          ensFrom = await this.provider.lookupAddress(`${from}`);
+        }
+
+        // Set the values for address to & from -- Shorten non ens
+        const initialFrom = from
+        const initialTo = to
+        to = config.ens && !ignoreENS ? (ensTo ? ensTo : this.shortenAddress(to)) : this.shortenAddress(to);
+        from = (isMint && config.includeFreeMint) ? 'Mint' : config.ens ? (ensFrom ? ensFrom : this.shortenAddress(from)) : this.shortenAddress(from);
+        
+        // Create response object
+        const tweetRequest: TweetRequest = {
+          logIndex: tx.index,
+          eventType: isMint ? 'mint' : 'sale',
+          initialFrom,
+          initialTo,
+          from,
+          to,
+          tokenId,
+          ether: parseFloat(ether),
+          transactionHash,
+          transactionDate,
+          alternateValue,
+          platform,
+        };
+
+        // If the image was successfully obtained
+        if (imageUrl) tweetRequest.imageUrl = imageUrl;
+
+        // console.log(`handled ${transactionHash} in ${new Date().getTime() - time}ms`)
+
+        return tweetRequest;
+
+      } catch (err) {
+        console.log(`${tokenId} failed to send, retryCount: ${retryCount}`, err);
+        retryCount++
+        if (retryCount >= 10)
+          return null;
+        console.log('retrying...')
       }
-
-      // If ens is configured, get ens addresses
-      let ensTo: string;
-      let ensFrom: string;
-      if (config.ens && !ignoreENS) {
-        ensTo = await this.provider.lookupAddress(`${to}`);
-        ensFrom = await this.provider.lookupAddress(`${from}`);
-      }
-
-      // Set the values for address to & from -- Shorten non ens
-      const initialFrom = from
-      const initialTo = to
-      to = config.ens && !ignoreENS ? (ensTo ? ensTo : this.shortenAddress(to)) : this.shortenAddress(to);
-      from = (isMint && config.includeFreeMint) ? 'Mint' : config.ens ? (ensFrom ? ensFrom : this.shortenAddress(from)) : this.shortenAddress(from);
-      
-      // Create response object
-      const tweetRequest: TweetRequest = {
-        logIndex: tx.index,
-        eventType: isMint ? 'mint' : 'sale',
-        initialFrom,
-        initialTo,
-        from,
-        to,
-        tokenId,
-        ether: parseFloat(ether),
-        transactionHash,
-        transactionDate,
-        alternateValue,
-        platform,
-      };
-
-      // If the image was successfully obtained
-      if (imageUrl) tweetRequest.imageUrl = imageUrl;
-
-      // console.log(`handled ${transactionHash} in ${new Date().getTime() - time}ms`)
-
-      return tweetRequest;
-
-    } catch (err) {
-      console.log(`${tokenId} failed to send`, err);
-      return null;
     }
   }
 
