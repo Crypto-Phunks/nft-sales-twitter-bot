@@ -66,6 +66,8 @@ block `statistic_initial_block`. Once indexed, the discord bot will reply to the
 - `/owned <wallet>` will display a list of the owned tokens by a wallet.
 - `/wallet <wallet>` will display some statistics for a given wallet (owned token, days since the first owned tokens, total volume of transaction)
 - `/volume <window>` will display a volume of transactions per marketplace.
+- `/graph <wallet>` will display a graph showing the average price and the volume of transaction over time, the `wallet` parameter is optional and will filter out the data on the specified wallet.
+- `/traders <window> <wallet>` will display the top 20 traders for the tracked collection over the specified time window, the `wallet` parameter is optional and will force the given wallet to be displayed along it's rank if it has traded at least one NFT over the specified period.
 
 The message templates for each command can be customized through the configuration file.
 
@@ -76,6 +78,14 @@ You can use this app as a standalone cli using the following command line along 
 ```
 npm run cli -- --action=tweet --contract=0xA6Cd272874Ee7C872Eb66801Eff62784C0b13285 --block=17886451 --tx=0x6018d9290709e7d34c820b23820aaacf960af9c4f073b661136d49fc0994d6c9
 ```
+
+Will replay the given transaction and trigger the tweets detected within it. And:
+
+```
+npm run cli -- --action=index --contract=0xf07468eAd8cf26c752C676E43C814FEe9c8CF402 --block=14763639 --tx=0x1e0667e75e4aba0f5cb303d79969a7514ed1248b91889d2bb553863992ddff7e
+```
+
+Will index the given transaction into the statistics module.
 
 ## Running the app
 
