@@ -24,6 +24,7 @@
     "@nestjs/platform-express": "^8.0.0",
     "axios": "^0.26.1",
     "better-sqlite3": "^8.5.0",
+    "canvas": "^2.11.2",
     "chart.js": "^3.9.1",
     "chartjs-node-canvas": "^4.1.6",
     "concurrently": "^7.2.2",

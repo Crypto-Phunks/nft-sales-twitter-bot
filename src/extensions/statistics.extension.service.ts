@@ -1,3 +1,4 @@
+import { createCanvas, loadImage } from 'canvas';
 import { Injectable } from '@nestjs/common';
 import { format } from 'date-fns';
 import { Chart as ChartJS, ChartConfiguration, ChartComponentLike } from 'chart.js';
@@ -143,7 +144,7 @@ export class StatisticsService extends BaseService {
           interaction.editReply(template)
         } else if ('owned' === interaction.commandName) {
           await interaction.deferReply()
-          const wallet = interaction.options.get('wallet').name.toString()
+          const wallet = interaction.options.get('wallet').value.toString()
           let lookupWallet = wallet
           if (!lookupWallet.startsWith('0x')) {
             // try to find the matching wallet
@@ -161,12 +162,47 @@ export class StatisticsService extends BaseService {
           //const tokensUrl = tokens.map((token) => config.discord_owned_tokens_image_path.replace(new RegExp('<tokenId>', 'g'), `${token.token_id}`.padStart(4, '0')))
           const tokensIds = tokens.map((token) => `#${token.token_id}`)
           const lastEvent = await this.lastEvent()
+
+          // generate an image containing the tokens 
+          const MAX_IMAGE_WIDTH = 1000
+          let imagesPerLine = Math.ceil(Math.sqrt(tokens.length))
+          let linesCount = Math.ceil(tokens.length/imagesPerLine)
+          let oneImageWidth = 100
+          // reduce this if it doesn't fit
+          if (imagesPerLine*oneImageWidth > MAX_IMAGE_WIDTH) {
+            oneImageWidth = Math.floor(MAX_IMAGE_WIDTH/imagesPerLine)
+          }
+          const imageWidth = imagesPerLine*oneImageWidth
+          const canvas = createCanvas(imagesPerLine*oneImageWidth, linesCount*oneImageWidth)
+          const context = canvas.getContext('2d')
+
+          let x = 0, y = 0
+          for (let token of tokens) {
+            const imageUrl = `${config.local_image_path}${token.token_id.toString().padStart(4, '0')}.png`
+            const tokenImageData = await this.getImageFile(imageUrl)
+
+            const tokenImage = await loadImage(tokenImageData)
+            console.log(imageUrl, x, y, oneImageWidth)
+            context.drawImage(tokenImage, x, y, oneImageWidth, oneImageWidth);
+
+            //outputImage.drawImage(tokenImage, x, y)
+            x += oneImageWidth
+            if (x >= imageWidth) {
+              x = 0
+              y += oneImageWidth
+            }
+          }
+
           let template = config.ownedTokensMessageDiscord
           template = template.replace(new RegExp('<wallet>', 'g'), ensisedWallet);
           template = template.replace(new RegExp('<tokens>', 'g'), tokensIds.join(', '));
+          template = template.replace(new RegExp('<count>', 'g'), tokensIds.length);
           template = template.replace(new RegExp('<last_event>', 'g'), lastEvent.last_event);
 
-          await interaction.editReply(template);
+          await interaction.editReply({
+            content: template,
+            files: [canvas.toBuffer('image/png')]
+          });
 
         } else if ('graph' === interaction.commandName) {
           await interaction.deferReply()
