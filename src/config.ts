@@ -30,7 +30,7 @@ export const config = {
   // <txHash> =========================== The transaction hash //
   // <from> ===================================== From address //
   // <to> ========================================= To address //
-  ownedTokensMessageDiscord: 'Here are the tokens owned by the wallet: `<wallet>`!\n\n<tokens>\n\n-- Indexing in progress, last event indexed: `<last_event>`',
+  ownedTokensMessageDiscord: 'Here are the <count> tokens owned by the wallet: `<wallet>`!\n\n-- Indexing in progress, last event indexed: `<last_event>`',
   graphStatisticsMessageDiscord: 'Here is the graph you requested (wallet: `<wallet>)`!\n\n-- Indexing in progress, last event indexed: `<last_event>`',
   userStatisticsMessageDiscord: 'Hey, here are the stats you requested about `<wallet>`!\n\n⏳ It holded a Cryptophunks for the first time <holder_since> days ago.\n💰 It executed <tx_count> transactions involving phunks with a total volume of <volume>Ξ.\n🧮 It is currently holding <owned_tokens> tokens.\n\n-- Indexing in progress, last event indexed: `<last_event>`',
   globalStatisticsMessageDiscord: 'Hey, here are the volume per platform (time window: <window>) ! 💰\n\nNot larva labs: <nll_volume>Ξ\nLooks rare: <lr_volume>Ξ\nBlur IO: <blurio_volume>Ξ\nNFTX: <nftx_volume>Ξ\nX2Y2: <x2y2_volume>Ξ\nOpensea: <os_volume>Ξ\nCargo: <cargo_volume>Ξ\nRarible: <rarible_volume>Ξ\nUnknown: <unknown_volume>Ξ\n—\nTotal: <total_volume>Ξ\n\n— Indexing in progress, last event indexed: `<last_event>`',
