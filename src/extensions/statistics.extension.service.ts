@@ -478,7 +478,7 @@ getOwnedTokens(wallet:string) {
 
   async getTopTraders(wallet:string, period:string) {
     
-    if (!wallet.startsWith('0x')) {
+    if (wallet && !wallet.startsWith('0x')) {
       // try to find the matching wallet
       const address = await this.provider.resolveName(`${wallet}`);
       if (address) wallet = address
