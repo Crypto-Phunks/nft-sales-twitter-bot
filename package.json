@@ -44,6 +44,7 @@
     "service": "^0.1.4",
     "twitter-api-v2": "^1.15.0",
     "web3-utils": "^1.7.1",
+    "winston": "^3.10.0",
     "yargs": "^17.7.2"
   },
   "devDependencies": {

@@ -14,6 +14,9 @@ import openseaSeaportABI from './abi/seaportABI.json';
 
 import { config } from './config';
 import { BaseService, TweetRequest } from './base.service';
+import { createLogger } from './logging.utils';
+
+const logger = createLogger('erc721sales.service')
 
 const looksRareContractAddress = '0x59728544b08ab483533076417fbbb2fd0b17ce3a'; // Don't change unless deprecated
 const looksRareContractAddressV2 = '0x0000000000e655fae4d56241588680f86e3b2377'; // Don't change unless deprecated
@@ -81,13 +84,20 @@ export class Erc721SalesService extends BaseService {
         let from = coder.decode(['address'], tx?.topics[1])[0];
         let to = coder.decode(['address'], tx?.topics[2])[0];
         
+        // usefull to break on a specific log
+        /*
+        if (tx?.index === 114) {
+          logger.info('break')
+        }
+        */
+       
         // ignore internal transfers to contract, another transfer event will handle this 
         // transaction afterward (the one that'll go to the buyer wallet)
-        const code = await this.provider.getCode(to)
         /*
+        const code = await this.provider.getCode(to)
         we need this for stats
         if (code !== '0x') {
-          console.log(`contract detected for ${tx.transactionHash} event index ${tx.index}`)
+          logger.info(`contract detected for ${tx.transactionHash} event index ${tx.index}`)
           return
         }
         */
@@ -98,6 +108,13 @@ export class Erc721SalesService extends BaseService {
         // Get tokenId from topics
         tokenId = hexToNumberString(tx?.topics[3]);
 
+        // usefull to break on a token
+        /*
+        if (tokenId === '571') {
+          logger.info('break')
+        }
+        */
+
         // Get transaction hash
         const { transactionHash } = tx;
         const time = new Date().getTime()
@@ -107,7 +124,7 @@ export class Erc721SalesService extends BaseService {
         const transaction = await this.provider.getTransaction(transactionHash);
         const block = await this.provider.getBlock(transaction.blockNumber)
         const transactionDate = block.date.toISOString()      
-        console.log(`handling ${transactionHash} log ${tx.index} — ${transactionDate}`)
+        logger.info(`handling ${transactionHash} token ${tokenId} log ${tx.index} — ${transactionDate}`)
         
         const { value } = transaction;
         let ether = ethers.formatEther(value.toString());
@@ -271,10 +288,10 @@ export class Erc721SalesService extends BaseService {
             // add weth
             const wethOffers = matchingOffers.map(o => o.token === '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2' && o.amount > 0 ? BigInt(o.amount) : BigInt(0));
             if (wethOffers.length > 0 && wethOffers[0] != BigInt(0)) {
-              console.log('found weth offer, using it as amount')
+              logger.info('found weth offer, using it as amount')
               amounts = wethOffers
             }
-            console.log(amounts)
+            logger.info(amounts)
             const amount = amounts.reduce((previous,current) => previous + current, BigInt(0))
             return amount / BigInt('1000000000000000') / BigInt(tokenCount)
           }
@@ -345,7 +362,7 @@ export class Erc721SalesService extends BaseService {
               }, BigInt(0))
             
             ether = (parseFloat((l / BigInt('10000000000000000')).toString())/100).toString()
-            console.log(ether)
+            logger.info(ether)
           }
           alternateValue = parseFloat(ether)/count
         } else if (CARGO.length) {
@@ -360,7 +377,7 @@ export class Erc721SalesService extends BaseService {
         // if there is an NFTX swap involved, ignore this transfer
         const swaps = receipt.logs.filter((log2: any) => log2.topics[0].toLowerCase() === '0x7af2bc3f8ec800c569b6555feaf16589d96a9d04a49d1645fd456d75fa0b372b')
         if (swaps.length) {
-          console.log('nftx swap involved in this transaction')
+          logger.info('nftx swap involved in this transaction')
           if (ignoreNftxSwaps)
             return
           else 
@@ -400,16 +417,16 @@ export class Erc721SalesService extends BaseService {
         // If the image was successfully obtained
         if (imageUrl) tweetRequest.imageUrl = imageUrl;
 
-        // console.log(`handled ${transactionHash} in ${new Date().getTime() - time}ms`)
+        // logger.info(`handled ${transactionHash} in ${new Date().getTime() - time}ms`)
 
         return tweetRequest;
 
       } catch (err) {
-        console.log(`${tokenId} failed to send, retryCount: ${retryCount}`, err);
+        logger.info(`${tokenId} failed to send, retryCount: ${retryCount}`, err);
         retryCount++
         if (retryCount >= 10)
           return null;
-        console.log('retrying...')
+        logger.info('retrying...')
       }
     }
   }

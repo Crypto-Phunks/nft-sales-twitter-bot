@@ -14,12 +14,15 @@ import rl from 'readline-sync'
 import { SlashCommandBuilder } from '@discordjs/builders';
 import { REST } from '@discordjs/rest'
 import { Routes } from 'discord-api-types/v9'
+import { createLogger } from 'src/logging.utils';
+
+const logger = createLogger('statistics.service')
 
 @Injectable()
 export class StatisticsService extends BaseService {
   
   provider = this.getWeb3Provider();
-  db = new Database(`${process.env.WORK_DIRECTORY || './'}db.db` /*, { verbose: console.log } */);  
+  db = new Database(`${process.env.WORK_DIRECTORY || './'}db.db` /*, { verbose: logger.info } */);  
   insert: any;
   positionCheck: any;
   positionUpdate: any;
@@ -29,7 +32,7 @@ export class StatisticsService extends BaseService {
     protected readonly erc721service: Erc721SalesService,
   ) {
     super(http)
-    console.log('creating StatisticsService')
+    logger.info('creating StatisticsService')
     this.discordClient.init()
     
     if (!global.doNotStartAutomatically)
@@ -249,7 +252,7 @@ Amount:   ${'Ξ'+(Math.floor(r.amount*100)/100).toFixed(2)}`)
             const tokenImageData = await this.getImageFile(imageUrl)
 
             const tokenImage = await loadImage(tokenImageData)
-            console.log(imageUrl, x, y, oneImageWidth)
+            logger.info(imageUrl, x, y, oneImageWidth)
             context.drawImage(tokenImage, x, y, oneImageWidth, oneImageWidth);
 
             //outputImage.drawImage(tokenImage, x, y)
@@ -340,7 +343,7 @@ Amount:   ${'Ξ'+(Math.floor(r.amount*100)/100).toFixed(2)}`)
           await interaction.editReply(template);          
         }
       } catch (err) {
-        console.log(err)
+        logger.info(err)
       }
     });      
   }
@@ -474,7 +477,7 @@ getOwnedTokens(wallet:string) {
       this.positionUpdate.run({currentBlock: config.statistic_initial_block});
 
     /*
-    console.log('create indexes');
+    logger.info('create indexes');
     db.run('CREATE INDEX idx_type_date ON events(event_type, tx_date);');
     db.run('CREATE INDEX idx_type_platform_date ON events(event_type, platform, tx_date);');
     db.run('CREATE INDEX idx_date ON events(tx_date);');
@@ -505,21 +508,21 @@ getOwnedTokens(wallet:string) {
         // check the latest available block
         const latestAvailableBlock = await this.provider.getBlockNumber()
         if (currentBlock > latestAvailableBlock - 1) {
-          console.log(`latest block reached (${latestAvailableBlock}), waiting the next available block...`)
+          logger.info(`latest block reached (${latestAvailableBlock}), waiting the next available block...`)
           await delay(20000)
           continue
         }
-        console.log('querying ' + currentBlock)
+        logger.info('querying ' + currentBlock)
         await tokenContract.queryFilter(filter, 
           currentBlock, 
           currentBlock+chunkSize).then(async (events:any) => {
             await this.handleEvents(events)
             this.positionUpdate.run({currentBlock});
             currentBlock += chunkSize
-            console.log('moving to next block')    
+            logger.info('moving to next block')    
           });
       } catch (err) {
-        console.log('probably 429 spotted — delaying next call', err)
+        logger.info('probably 429 spotted — delaying next call', err)
         await delay(5000)
       }
     }    
