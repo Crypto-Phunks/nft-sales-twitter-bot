@@ -10,10 +10,10 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import { config } from './config';
-import { Client, TextChannel } from 'discord.js';
 import TwitterClient from './clients/twitter';
 import { EUploadMimeType } from 'twitter-api-v2';
 import DiscordClient from './clients/discord';
+import { createLogger } from './logging.utils';
 
 export const alchemyAPIUrl = 'https://eth-mainnet.alchemyapi.io/v2/';
 export const alchemyAPIKey = process.env.ALCHEMY_API_KEY;
@@ -37,6 +37,8 @@ export interface TweetRequest {
   additionalText?: string;
 
 }
+
+const logger = createLogger('base.service')
 
 @Injectable()
 export class BaseService {
@@ -131,12 +133,12 @@ export class BaseService {
       { media: { media_ids: [media_id] } },
     );
     if (!errors) {
-      console.log(
+      logger.info(
         `Successfully tweeted: ${createdTweet.id} -> ${createdTweet.text}`,
       );
       return createdTweet;
     } else {
-      console.error(errors);
+      logger.error(errors);
       return null;
     }
   }
@@ -191,7 +193,7 @@ export class BaseService {
       map((res: any) => res.data),
       // tap((res) => console.log(res)),
       catchError((err: any) => {
-        console.warn('coin gecko call failed, ignoring fiat price', err.toString());
+        logger.warn('coin gecko call failed, ignoring fiat price', err.toString());
         return of(undefined);
       })
     );

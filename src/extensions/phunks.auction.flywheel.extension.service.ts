@@ -4,6 +4,9 @@ import { BaseService, TweetRequest } from '../base.service';
 import { ethers } from 'ethers';
 import phunkAuctionFlywheel from '../abi/phunkAuctionFlywheel.json';
 import { config } from '../config';
+import { createLogger } from 'src/logging.utils';
+
+const logger = createLogger('phunksauction.service')
 
 @Injectable()
 export class PhunksAuctionFlywheelService extends BaseService {
@@ -14,7 +17,7 @@ export class PhunksAuctionFlywheelService extends BaseService {
     protected readonly http: HttpService,
   ) {
     super(http)
-    console.log('creating PhunksAuctionFlywheelService')
+    logger.info('creating PhunksAuctionFlywheelService')
     
     this.initDiscordClient()
     

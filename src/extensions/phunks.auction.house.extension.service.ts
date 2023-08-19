@@ -4,6 +4,9 @@ import { BaseService, TweetRequest } from '../base.service';
 import { ethers } from 'ethers';
 import phunksAuctionHouse from '../abi/phunkAuctionHouse.json';
 import { config } from '../config';
+import { createLogger } from 'src/logging.utils';
+
+const logger = createLogger('phunksauctionhouse.service')
 
 @Injectable()
 export class PhunksAuctionHouseService extends BaseService {
@@ -14,7 +17,7 @@ export class PhunksAuctionHouseService extends BaseService {
     protected readonly http: HttpService,
   ) {
     super(http)
-    console.log('creating PhunksAuctionHouseService')
+    logger.info('creating PhunksAuctionHouseService')
     this.initDiscordClient()
     
     // Listen for auction settled event

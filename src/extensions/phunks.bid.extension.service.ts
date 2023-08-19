@@ -4,6 +4,9 @@ import { BaseService, TweetRequest } from '../base.service';
 import { ethers } from 'ethers';
 import notLarvaLabsAbi from '../abi/notlarvalabs.json';
 import { config } from '../config';
+import { createLogger } from 'src/logging.utils';
+
+const logger = createLogger('phunks.bid.extension.service')
 
 @Injectable()
 export class PhunksBidService extends BaseService {
@@ -14,7 +17,7 @@ export class PhunksBidService extends BaseService {
     protected readonly http: HttpService,
   ) {
     super(http)
-    console.log('creating PhunksBidService')
+    logger.info('creating PhunksBidService')
 
     this.initDiscordClient()
     
