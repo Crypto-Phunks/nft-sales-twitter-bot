@@ -68,6 +68,8 @@ block `statistic_initial_block`. Once indexed, the discord bot will reply to the
 - `/volume <window>` will display a volume of transactions per marketplace.
 - `/graph <wallet>` will display a graph showing the average price and the volume of transaction over time, the `wallet` parameter is optional and will filter out the data on the specified wallet.
 - `/traders <window> <wallet>` will display the top 20 traders for the tracked collection over the specified time window, the `wallet` parameter is optional and will force the given wallet to be displayed along it's rank if it has traded at least one NFT over the specified period.
+- `/index <block> <tx>` force indexation by the statistic module of the given transaction within the given block.
+- `/transaction <tx>` displays indexed informations about a given transaction, usefull for debugging purpose.
 
 The message templates for each command can be customized through the configuration file.
 

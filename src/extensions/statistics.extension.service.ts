@@ -60,6 +60,26 @@ export class StatisticsService extends BaseService {
           .setDescription('Wallet address or ENS name')
           .setRequired(true));
 
+    const checkTransaction = new SlashCommandBuilder()
+      .setName('transaction')
+      .setDescription('Get index informations about a given transaction')
+      .addStringOption(option =>
+        option.setName('tx')
+          .setDescription('Transaction hash')
+          .setRequired(true));
+
+    const indexTransaction = new SlashCommandBuilder()
+      .setName('index')
+      .setDescription('Get index informations about a given transaction')
+      .addStringOption(option =>
+        option.setName('block')
+          .setDescription('Block number')
+          .setRequired(true))
+      .addStringOption(option =>
+        option.setName('tx')
+          .setDescription('Transaction hash')
+          .setRequired(true));
+
     const volumeStats = new SlashCommandBuilder()
       .setName('volume')
       .setDescription('Get volume statistics')
@@ -124,14 +144,61 @@ export class StatisticsService extends BaseService {
     guildIds.forEach(async (guildId) => {
       await rest.put(
         Routes.applicationGuildCommands(config.discord_client_id, guildId),
-        { body: [userStats.toJSON(), topTraders.toJSON(), volumeStats.toJSON(), graphStats.toJSON(), ownedTokens.toJSON()] },
+        { body: [
+          userStats.toJSON(), 
+          topTraders.toJSON(), 
+          volumeStats.toJSON(), 
+          graphStats.toJSON(), 
+          checkTransaction.toJSON(),
+          indexTransaction.toJSON(),
+          ownedTokens.toJSON()] },
       );    
     })
 
     this.discordClient.client.on('interactionCreate', async (interaction) => {
       try {
         if (!interaction.isCommand()) return;
-        if ('traders' === interaction.commandName) {
+        if ('index' === interaction.commandName) {
+          await interaction.deferReply()
+          const tx = interaction.options.get('tx').value.toString()
+          const block = parseInt(interaction.options.get('block').value.toString())
+          const tokenContract = new ethers.Contract(config.contract_address, erc721abi, this.getWeb3Provider());
+          let filter = tokenContract.filters.Transfer();
+  
+          const events = (await tokenContract.queryFilter(filter, 
+            block, 
+            block))
+            .filter(e => e.transactionHash === tx)
+          
+          const count = events.length
+          await this.handleEvents(events)
+          interaction.editReply(`succesfully indexed ${count} blockchain transfer events for \`${tx}\`...`)
+        } else if ('transaction' === interaction.commandName) {
+          await interaction.deferReply()
+          const tx = interaction.options.get('tx').value.toString()
+          const result = await this.getTransaction(tx)
+          let template = `Indexed informations for ${tx}: \n\n`
+          let txs = []
+          let reduced = false
+          for (let r of result) {
+            txs.push(`
+Token:    ${r.token_id}
+From:     ${r.from_wallet}
+To:       ${r.to_wallet}
+Platform: ${r.platform}
+Amount:   ${'Ξ'+(Math.floor(r.amount*100)/100).toFixed(2)}`)
+          }
+          if (txs.length > 0) template += '---'
+          template += `${txs.join('\n---')}\n`
+
+          interaction.editReply({
+            content: 'Here are the logs for this transaction.',
+            files: [{
+              attachment: Buffer.from(template, 'utf-8'),
+              name: 'transaction.txt'
+            }]
+          })
+        } else if ('traders' === interaction.commandName) {
           await interaction.deferReply()
           const wallet = interaction.options.get('wallet')?.value?.toString()
           const window = interaction.options.get('window').value.toString()
@@ -472,6 +539,11 @@ getOwnedTokens(wallet:string) {
         this.insert.run(result);
       }  
     }
+  }
+  
+  async getTransaction(tx:string) {
+    const sql = `select * from events where tx = @tx`
+    return this.db.prepare(sql).all({tx})
   }
 
   async getTopTraders(wallet:string, period:string) {
