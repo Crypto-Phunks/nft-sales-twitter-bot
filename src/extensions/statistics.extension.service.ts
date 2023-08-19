@@ -459,8 +459,7 @@ getOwnedTokens(wallet:string) {
   }
 
   async handleEvents(events:any) {
-    let i = 0
-    while (i < events.length) {
+    while (events.length > 0) {
       const elements = events.splice(0, 10)
       await delay(500)
       const results = await Promise.all(elements
@@ -472,7 +471,6 @@ getOwnedTokens(wallet:string) {
           result.alternateValue = result.ether
         this.insert.run(result);
       }  
-      i += 10
     }
   }
 
