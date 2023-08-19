@@ -519,7 +519,8 @@ getOwnedTokens(wallet:string) {
             await this.handleEvents(events)
             this.positionUpdate.run({currentBlock});
             currentBlock += chunkSize
-            logger.info('moving to next block')    
+            if (currentBlock > latestAvailableBlock) currentBlock = latestAvailableBlock
+            logger.info('moving to next block, ' + currentBlock)    
           });
       } catch (err) {
         logger.info('probably 429 spotted — delaying next call', err)
