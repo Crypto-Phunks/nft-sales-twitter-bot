@@ -8,6 +8,8 @@
     "prebuild": "rimraf dist",
     "build": "nest build",
     "cli": "nest start --entryFile cli.module.js --",
+    "cli:extension:flywheel": "nest start --entryFile extensions/phunks.auction.flywheel.cli.extension.js --",
+    "cli:extension:auctionhouse": "nest start --entryFile extensions/phunks.auction.house.cli.extension.js --",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
