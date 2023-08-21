@@ -26,6 +26,7 @@ export class StatisticsService extends BaseService {
   insert: any;
   positionCheck: any;
   positionUpdate: any;
+  currentBlock: number;
 
   constructor(
     protected readonly http: HttpService,
@@ -71,6 +72,10 @@ export class StatisticsService extends BaseService {
           .setDescription('Transaction hash')
           .setRequired(true));
 
+    const status = new SlashCommandBuilder()
+      .setName('status')
+      .setDescription('Get current indexer status')
+      
     const indexTransaction = new SlashCommandBuilder()
       .setName('index')
       .setDescription('Get index informations about a given transaction')
@@ -148,6 +153,7 @@ export class StatisticsService extends BaseService {
       await rest.put(
         Routes.applicationGuildCommands(config.discord_client_id, guildId),
         { body: [
+          status.toJSON(),
           userStats.toJSON(), 
           topTraders.toJSON(), 
           volumeStats.toJSON(), 
@@ -161,7 +167,10 @@ export class StatisticsService extends BaseService {
     this.discordClient.client.on('interactionCreate', async (interaction) => {
       try {
         if (!interaction.isCommand()) return;
-        if ('index' === interaction.commandName) {
+        if ('status' === interaction.commandName) {
+          await interaction.deferReply()
+          interaction.editReply(`Running, current block ${this.currentBlock}...`)
+        } else if ('index' === interaction.commandName) {
           await interaction.deferReply()
           const tx = interaction.options.get('tx').value.toString()
           const block = parseInt(interaction.options.get('block').value.toString())
@@ -268,6 +277,7 @@ Amount:   ${'Ξ'+(Math.floor(r.amount*100)/100).toFixed(2)}`)
           template = template.replace(new RegExp('<tokens>', 'g'), tokensIds.join(', '));
           template = template.replace(new RegExp('<count>', 'g'), tokensIds.length);
           template = template.replace(new RegExp('<last_event>', 'g'), lastEvent.last_event);
+          template = template.replace(new RegExp('<current_block>', 'g'), `${this.currentBlock}`);
 
           await interaction.editReply({
             content: template,
@@ -287,6 +297,7 @@ Amount:   ${'Ξ'+(Math.floor(r.amount*100)/100).toFixed(2)}`)
           const lastEvent = await this.lastEvent()
           let template = config.graphStatisticsMessageDiscord
           template = template.replace(new RegExp('<last_event>', 'g'), lastEvent.last_event);
+          template = template.replace(new RegExp('<current_block>', 'g'), `${this.currentBlock}`);
           template = template.replace(new RegExp('<wallet>', 'g'), ensisedWallet ?? 'all');
 
           const buffer = await this.generateChart(lookupWallet)
@@ -318,6 +329,7 @@ Amount:   ${'Ξ'+(Math.floor(r.amount*100)/100).toFixed(2)}`)
           template = template.replace(new RegExp('<volume>', 'g'), `${Math.round(stats.volume*100)/100}`);
           template = template.replace(new RegExp('<holder_since>', 'g'), stats.holder_since_days);
           template = template.replace(new RegExp('<owned_tokens>', 'g'), stats.owned_tokens);
+          template = template.replace(new RegExp('<current_block>', 'g'), `${this.currentBlock}`);
 
           await interaction.editReply(template);
         } else if ('volume' === interaction.commandName) {
@@ -339,6 +351,7 @@ Amount:   ${'Ξ'+(Math.floor(r.amount*100)/100).toFixed(2)}`)
           template = template.replace(new RegExp('<rarible_volume>', 'g'), this.getPlatformStats('rarible', stats));
           template = template.replace(new RegExp('<unknown_volume>', 'g'), this.getPlatformStats('unknown', stats));
           template = template.replace(new RegExp('<total_volume>', 'g'), totalVolume);
+          template = template.replace(new RegExp('<current_block>', 'g'), `${this.currentBlock}`);
 
           await interaction.editReply(template);          
         }
@@ -494,12 +507,11 @@ getOwnedTokens(wallet:string) {
       `SELECT * FROM configuration WHERE key = 'currentBlock'`,
     ).get();
 
-    let currentBlock:number
-    if (result && result.value) currentBlock = result.value
+    if (result && result.value) this.currentBlock = result.value
     else {
-      currentBlock = await rl.question('Enter the block to start with:\n')
+      this.currentBlock = await rl.question('Enter the block to start with:\n')
     }
-    currentBlock = parseInt(currentBlock+'')
+    this.currentBlock = parseInt(this.currentBlock+'')
 
     const chunkSize = 100
     
@@ -507,20 +519,20 @@ getOwnedTokens(wallet:string) {
       try {
         // check the latest available block
         const latestAvailableBlock = await this.provider.getBlockNumber()
-        if (currentBlock > latestAvailableBlock - 1) {
+        if (this.currentBlock > latestAvailableBlock - 1) {
           logger.info(`latest block reached (${latestAvailableBlock}), waiting the next available block...`)
           await delay(20000)
           continue
         }
-        logger.info('querying ' + currentBlock)
+        logger.info('querying ' + this.currentBlock)
         await tokenContract.queryFilter(filter, 
-          currentBlock, 
-          currentBlock+chunkSize).then(async (events:any) => {
+          this.currentBlock, 
+          this.currentBlock+chunkSize).then(async (events:any) => {
             await this.handleEvents(events)
-            this.positionUpdate.run({currentBlock});
-            currentBlock += chunkSize
-            if (currentBlock > latestAvailableBlock) currentBlock = latestAvailableBlock
-            logger.info('moving to next block, ' + currentBlock)    
+            this.positionUpdate.run({currentBlock: this.currentBlock});
+            this.currentBlock += chunkSize
+            if (this.currentBlock > latestAvailableBlock) this.currentBlock = latestAvailableBlock
+            logger.info('moving to next block, ' + this.currentBlock)    
           });
       } catch (err) {
         logger.info('probably 429 spotted — delaying next call', err)

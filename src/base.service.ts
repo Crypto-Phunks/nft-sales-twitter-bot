@@ -20,6 +20,24 @@ export const alchemyAPIKey = process.env.ALCHEMY_API_KEY;
 //const provider = ethers.getDefaultProvider(alchemyAPIUrl + alchemyAPIKey);
 const provider = ethers.getDefaultProvider(process.env.GETH_NODE_ENDPOINT);
 
+const logger = createLogger('base.service')
+
+let watchdog = startWatchdog()
+
+function startWatchdog() {
+  return setTimeout(async () => {
+    const timeoutInterval = setTimeout(() => {
+      logger.warn(`Websocket connection hanged! Killing myself.`)
+      process.exit(1)
+    }, 10000);
+    logger.info(`Checking websocket connection...`)
+    const block = await provider.getBlockNumber()
+    logger.info(`Websocket connection alive: ${block} !`)
+    clearInterval(timeoutInterval)
+    watchdog = startWatchdog()
+  }, 30000)  
+}
+
 export interface TweetRequest {
   platform: string,
   logIndex: number,
@@ -37,8 +55,6 @@ export interface TweetRequest {
   additionalText?: string;
 
 }
-
-const logger = createLogger('base.service')
 
 @Injectable()
 export class BaseService {
@@ -158,7 +174,9 @@ export class BaseService {
     template = template.replace(new RegExp('<ethPrice>', 'g'), eth.format());
     template = template.replace(new RegExp('<txHash>', 'g'), data.transactionHash);
     template = template.replace(new RegExp('<from>', 'g'), data.from);
+    template = template.replace(new RegExp('<initialFrom>', 'g'), data.initialFrom);
     template = template.replace(new RegExp('<to>', 'g'), data.to);
+    template = template.replace(new RegExp('<initialTo>', 'g'), data.initialTo);
     template = template.replace(new RegExp('<fiatPrice>', 'g'), fiat ? fiat.format() : '???');
     template = template.replace(new RegExp('<additionalText>', 'g'), data.additionalText);
 
