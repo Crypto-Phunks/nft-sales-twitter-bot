@@ -19,8 +19,8 @@ export default class DiscordClient {
   }
 
   async send(text:string, images:string[]) {
-    this.channels.forEach(channel => {
-      channel.send({
+    this.channels.forEach(async (channel) => {
+      await channel.send({
         content: text,
         files: images
       });          

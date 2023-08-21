@@ -50,6 +50,7 @@ async function bootstrap() {
 
     await app.close();
     console.log('end')
+    await delay(5000)
     exit(0)
   }
 }
