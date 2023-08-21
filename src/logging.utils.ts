@@ -10,11 +10,11 @@ export function createLogger(service:string) {
       }),
       winston.format.printf(info => `${info.timestamp} ${info.level}: ${info.message}`+(info.splat!==undefined?`${info.splat}`:" "))
   ),
-    defaultMeta: { service: 'base-service' },
+    defaultMeta: { service },
     transports: [
       new winston.transports.File({ filename: 'error.log', level: 'error' }),
       new DailyRotateFile({
-        filename: 'combined-%DATE%.log',
+        filename: 'logs/combined-%DATE%.log',
         datePattern: 'YYYY-MM-DD-HH',
         zippedArchive: true,
         maxSize: '20m',
