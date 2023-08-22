@@ -1,4 +1,4 @@
-import { Client, TextChannel } from "discord.js";
+import { Client, MessageAttachment, MessageEmbed, TextChannel } from "discord.js";
 import { config } from "../config";
 
 export default class DiscordClient {
@@ -16,6 +16,18 @@ export default class DiscordClient {
     });
     this.client.login(process.env.DISCORD_TOKEN);
     this.setup = true;
+  }
+
+  async sendEmbed(embed:MessageEmbed, image:string, platform:string) {
+    this.channels.forEach(async (channel) => {
+      await channel.send({
+        embeds: [embed],
+        files: [
+          {attachment: image, name: 'token.png'},
+          {attachment: platform, name: 'platform.png'},
+        ]
+      });          
+    });    
   }
 
   async send(text:string, images:string[]) {

@@ -49,12 +49,16 @@ export class StatisticsService extends BaseService {
     const rest = new REST().setToken(process.env.DISCORD_TOKEN);
     
     const userStats = new SlashCommandBuilder()
-      .setName('wallet')
+      .setName('userstats')
       .setDescription('Get statistics about a wallet')
       .addStringOption(option =>
         option.setName('wallet')
           .setDescription('Wallet address or ENS name (leave empty to ignore this filter)')
           .setRequired(true));
+    
+    const sample = new SlashCommandBuilder()
+      .setName('sample')
+      .setDescription('Shout a sample transaction for testing purpose')
     
     const ownedTokens = new SlashCommandBuilder()
       .setName('owned')
@@ -153,6 +157,7 @@ export class StatisticsService extends BaseService {
       await rest.put(
         Routes.applicationGuildCommands(config.discord_client_id, guildId),
         { body: [
+          // sample.toJSON(),
           status.toJSON(),
           userStats.toJSON(), 
           topTraders.toJSON(), 
@@ -167,7 +172,23 @@ export class StatisticsService extends BaseService {
     this.discordClient.client.on('interactionCreate', async (interaction) => {
       try {
         if (!interaction.isCommand()) return;
-        if ('status' === interaction.commandName) {
+        if ('sample' === interaction.commandName) {
+          await this.discord({
+            logIndex: 146,
+            eventType: 'sale',
+            initialFrom: '0x7e5ccBf79f81baF0430a9eD8208580c7157F143C',
+            initialTo: '0xB39185e33E8c28e0BB3DbBCe24DA5dEA6379Ae91',
+            from: '0x7e5...F143C',
+            to: '0xB39...9Ae91',
+            tokenId: '9608',
+            ether: 0,
+            transactionHash: '0xa13c09a4b0dc88f5e1914aca92675a2f19498d173d0ea2ada5df4652467b9e5b',
+            transactionDate: '2023-08-22T04:57:35.000Z',
+            alternateValue: 0.3205,
+            platform: 'nftx',
+            imageUrl: './token_images/phunk9608.png'
+          })
+        } else if ('status' === interaction.commandName) {
           await interaction.deferReply()
           interaction.editReply(`Running, current block ${this.currentBlock}...`)
         } else if ('index' === interaction.commandName) {

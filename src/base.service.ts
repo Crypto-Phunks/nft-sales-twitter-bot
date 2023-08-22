@@ -14,6 +14,7 @@ import TwitterClient from './clients/twitter';
 import { EUploadMimeType } from 'twitter-api-v2';
 import DiscordClient from './clients/discord';
 import { createLogger } from './logging.utils';
+import { HexColorString, MessageAttachment, MessageEmbed } from 'discord.js';
 
 export const alchemyAPIUrl = 'https://eth-mainnet.alchemyapi.io/v2/';
 export const alchemyAPIKey = process.env.ALCHEMY_API_KEY;
@@ -120,12 +121,33 @@ export class BaseService {
     await this.discord(data, tweet.id)
   }
   
-  async discord(data: TweetRequest, tweetId:string, template:string=config.saleMessageDiscord) {
+  async discord(data: TweetRequest, 
+                tweetId:string|undefined=undefined, 
+                template:string=config.saleMessageDiscord, 
+                color:string='#0084CA',
+                footerTextParam:string|undefined=undefined) {
     if (!this.discordClient.setup) return
-    template = template.replace(new RegExp('<tweetLink>', 'g'), `<https://twitter.com/i/web/status/${tweetId}>`);
+    if (tweetId) template = template.replace(new RegExp('<tweetLink>', 'g'), `<https://twitter.com/i/web/status/${tweetId}>`);
     const image = config.use_local_images ? data.imageUrl : this.transformImage(data.imageUrl);
-    const tweetText = this.formatText(data, template)
-    await this.discordClient.send(tweetText, [image]);
+    const platformImage = data.platform === 'nftx' ? 'NFTX.png' :
+      data.platform === 'opensea' ? 'OPENSEA.png' :
+      data.platform === 'looksrare' ? 'LOOKSRARE.png' :
+      data.platform === 'x2y2' ? 'X2Y2.png' :
+      data.platform === 'rarible' ? 'RARIBLE.png' :
+      data.platform === 'notlarvalabs' ? 'NLL.png' :
+      data.platform === 'phunkauction' ? 'AUCTION.png' :
+      data.platform === 'phunkflywheel' ? 'FLYWHEEL.png' :
+      'BLUR.png';
+    const sentText = this.formatText(data, template)
+    const footerText = footerTextParam ?? config.discord_footer_text
+    const embed = new MessageEmbed()
+      .setColor(color as HexColorString)
+      .setImage(`attachment://token.png`)
+      .setDescription(sentText)
+      .setTimestamp()
+      .setFooter({ text: footerText, iconURL: 'attachment://platform.png' });
+  
+    await this.discordClient.sendEmbed(embed, image, `platform_images/${platformImage}`);
   }
 
   async tweet(data: TweetRequest, template:string=config.saleMessage) {

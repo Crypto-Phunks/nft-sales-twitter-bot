@@ -15,6 +15,7 @@ export const config = {
   // this is a configuration for the phunk bid demo extension
   local_bids_image_path: './bids_images/Phunk_',
   discord_owned_tokens_image_path: 'http://70.34.216.182/token_images/phunk<tokenId>.png',
+  discord_footer_text: 'FLIP!',
   // this is a configuration for the phunk auction house demo extension
   local_auction_image_path: './auction_images/phunk',
   //
