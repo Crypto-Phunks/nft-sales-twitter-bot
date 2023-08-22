@@ -27,6 +27,29 @@ describe('Erc721SalesService', () => {
     expect(service).toBeDefined()
   });
 
+  it('0xc4ac7389ff1f636c523cafb395629c7a897d1ab8895f7871ef2a4ec9c6700f89 - multiple nftx swaps', async () => {
+    await delay(COOLDOWN_BETWEEN_TESTS)
+    const provider = service.getWeb3Provider()
+    config.contract_address = '0xf07468eAd8cf26c752C676E43C814FEe9c8CF402'
+    const tokenContract = new ethers.Contract('0xf07468eAd8cf26c752C676E43C814FEe9c8CF402', erc721abi, provider);
+    let filter = tokenContract.filters.Transfer();
+    const startingBlock = 17967815    
+    const events = await tokenContract.queryFilter(filter, 
+      startingBlock, 
+      startingBlock+1)
+    const results = await Promise.all(events.map(async (e) => await service.getTransactionDetails(e)))
+    //expect(results[0].alternateValue).toBe(0.31)
+    let logs = ''
+    results.forEach(r => {
+      logs += `${r.tokenId} sold for ${r.alternateValue}\n`
+    })
+
+    for (const event of events) {
+      const result = await service.getTransactionDetails(event)
+      expect(result.alternateValue).toBe(0.3443333333333333)
+    }
+    console.log(logs)
+  })
   it('0x28b859639993604a9b6c060deddede3e63c396134640cd03a6373fdc6bb8a6eb - single bid on blurio', async () => {
     await delay(COOLDOWN_BETWEEN_TESTS)
     const provider = service.getWeb3Provider()

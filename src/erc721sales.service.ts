@@ -179,7 +179,10 @@ export class Erc721SalesService extends BaseService {
                 const moneyIn = BigInt(`0x${relevantDataSlice[0]}`)
                 if (moneyIn > BigInt(0))
                   return moneyIn / BigInt('1000000000000000');
-                else return BigInt('0')
+                else {
+                  const moneyIn2 = BigInt(`0x${relevantDataSlice[1]}`)
+                  return moneyIn2 / BigInt('1000000000000000');
+                }
               })
             if (swaps.length) return swaps.reduce((previous, current) => previous + current, BigInt(0))
           }
