@@ -319,6 +319,11 @@ export class Erc721SalesService extends BaseService {
           if (redeemLog) {
             const parsedLog = nftxInterface.parseLog(redeemLog)
             tokenCount = Math.max(parsedLog.args.nftIds.length, 1)
+          } else {
+            // count the number of tokens transfered
+            tokenCount = receipt.logs
+            .filter(l => l.address.toLowerCase() === config.contract_address.toLowerCase() && 
+              l.topics[0].toLowerCase() === '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef').length            
           }
           alternateValue = parseFloat(NFTX[0].toString())/tokenCount/1000;
         } else if (NLL.length) {
@@ -427,9 +432,12 @@ export class Erc721SalesService extends BaseService {
       } catch (err) {
         logger.info(`${tokenId} failed to send, retryCount: ${retryCount}`, err);
         retryCount++
-        if (retryCount >= 10)
+        if (retryCount >= 10) {
+          logger.info("retried 10 times, giving up")
           return null;
-        logger.info('retrying...')
+        }
+        logger.info(`will retry after a delay ${retryCount}...`)
+        await new Promise( resolve => setTimeout(resolve, 500*retryCount) )
       }
     }
   }

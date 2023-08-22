@@ -9,10 +9,14 @@ const COOLDOWN_BETWEEN_TESTS = 1500
 
 describe('Erc721SalesService', () => {
   let service: Erc721SalesService;
-
   jest.setTimeout(60000) 
 
+  afterAll(() => {
+    service.provider.destroy()
+  });
+
   beforeEach(async () => {
+
     //jest.useFakeTimers()
 
     const module: TestingModule = await Test.createTestingModule({
@@ -26,6 +30,27 @@ describe('Erc721SalesService', () => {
   it('should be defined', () => {
     expect(service).toBeDefined()
   });
+
+  it('0xa13c09a4b0dc88f5e1914aca92675a2f19498d173d0ea2ada5df4652467b9e5b  - nftx transaction involving swap', async () => {
+    await delay(COOLDOWN_BETWEEN_TESTS)
+    const provider = service.getWeb3Provider()
+    config.contract_address = '0xf07468eAd8cf26c752C676E43C814FEe9c8CF402'
+    const tokenContract = new ethers.Contract('0xf07468eAd8cf26c752C676E43C814FEe9c8CF402', erc721abi, provider);
+    let filter = tokenContract.filters.Transfer();
+    const startingBlock = 17968015        
+    const events = await tokenContract.queryFilter(filter, 
+      startingBlock, 
+      startingBlock+1)
+    const results = await Promise.all(events.map(async (e) => await service.getTransactionDetails(e)))
+    //expect(results[0].alternateValue).toBe(0.31)
+    let logs = ''
+    results.forEach(r => {
+      logs += `${r.tokenId} sold for ${r.alternateValue}\n`
+      expect(r.alternateValue).toBe(0.3205)
+    })
+
+    console.log(logs)
+  })
 
   it('0xc4ac7389ff1f636c523cafb395629c7a897d1ab8895f7871ef2a4ec9c6700f89 - multiple nftx swaps', async () => {
     await delay(COOLDOWN_BETWEEN_TESTS)
@@ -67,8 +92,7 @@ describe('Erc721SalesService', () => {
       logs += `${r.tokenId} sold for ${r.alternateValue}\n`
     })
 
-    for (const event of events) {
-      const result = await service.getTransactionDetails(event)
+    for (const result of results) {
       expect(result.alternateValue).toBe(0.41)
     }
     console.log(logs)

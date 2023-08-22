@@ -18,11 +18,15 @@ import { createLogger } from './logging.utils';
 export const alchemyAPIUrl = 'https://eth-mainnet.alchemyapi.io/v2/';
 export const alchemyAPIKey = process.env.ALCHEMY_API_KEY;
 //const provider = ethers.getDefaultProvider(alchemyAPIUrl + alchemyAPIKey);
-const provider = ethers.getDefaultProvider(process.env.GETH_NODE_ENDPOINT);
+const provider = global.providerForceHTTPS ? 
+  ethers.getDefaultProvider(process.env.GETH_NODE_ENDPOINT_HTTP) :
+  ethers.getDefaultProvider(process.env.GETH_NODE_ENDPOINT);
 
 const logger = createLogger('base.service')
 
-let watchdog = startWatchdog()
+if (!global.noWatchdog) {
+  startWatchdog()
+}
 
 function startWatchdog() {
   return setTimeout(async () => {
@@ -34,7 +38,7 @@ function startWatchdog() {
     const block = await provider.getBlockNumber()
     logger.info(`Websocket connection alive: ${block} !`)
     clearInterval(timeoutInterval)
-    watchdog = startWatchdog()
+    startWatchdog()
   }, 30000)  
 }
 
