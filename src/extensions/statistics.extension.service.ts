@@ -326,7 +326,7 @@ Amount:   ${'Ξ'+(Math.floor(r.amount*100)/100).toFixed(2)}`)
             content: template,
             files: [buffer]
           });
-        } else if ('wallet' === interaction.commandName) {          
+        } else if ('userstats' === interaction.commandName) {          
           await interaction.deferReply()
           const wallet = interaction.options.get('wallet').value.toString()
           let lookupWallet = wallet
