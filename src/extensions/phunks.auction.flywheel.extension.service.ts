@@ -64,7 +64,7 @@ export class PhunksAuctionFlywheelService extends BaseService {
       imageUrl
     }
     const tweet = await this.tweet(request, config.flywheelMessage);
-    await this.discord(request, tweet.id, config.flywheelMessageDiscord);    
+    await this.discord(request, tweet.id, config.flywheelMessageDiscord, '#F99C1C', 'FLYWHEEL!');
   }
 
 }

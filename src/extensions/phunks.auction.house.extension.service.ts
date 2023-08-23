@@ -65,7 +65,7 @@ export class PhunksAuctionHouseService extends BaseService {
       imageUrl
     }
     const tweet = await this.tweet(request, config.auctionMessage);
-    await this.discord(request, tweet.id, config.auctionMessageDiscord);    
+    await this.discord(request, tweet.id, config.auctionMessageDiscord, '#FF04B4', 'AUCTION!');
   }
 
 }

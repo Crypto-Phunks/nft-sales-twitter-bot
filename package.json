@@ -74,6 +74,10 @@
     "typescript": "^4.3.5"
   },
   "jest": {
+    "globals": {
+       "noWatchdog": true,
+       "providerForceHTTPS": true
+    },
     "moduleFileExtensions": [
       "js",
       "json",
