@@ -246,65 +246,73 @@ Amount:   ${'Ξ'+(Math.floor(r.amount*100)/100).toFixed(2)}`)
           await interaction.deferReply()
           const wallet = interaction.options.get('wallet').value.toString()
           let lookupWallet = wallet
-          if (!lookupWallet.startsWith('0x')) {
-            // try to find the matching wallet
-            const address = await this.provider.resolveName(`${wallet}`);
-            if (address) lookupWallet = address
-          }
           let ensisedWallet = wallet
-          if (wallet.startsWith('0x')) {
-            // try to lookup a matching ENS name
-            const ens = await this.provider.lookupAddress(`${wallet}`);
-            if (ens) ensisedWallet = ens
-          }
-
-          const tokens = await this.getOwnedTokens(lookupWallet)
-          //const tokensUrl = tokens.map((token) => config.discord_owned_tokens_image_path.replace(new RegExp('<tokenId>', 'g'), `${token.token_id}`.padStart(4, '0')))
-          const tokensIds = tokens.map((token) => `#${token.token_id}`)
-          const lastEvent = await this.lastEvent()
-
-          // generate an image containing the tokens 
-          const MAX_IMAGE_WIDTH = 1000
-          let imagesPerLine = Math.ceil(Math.sqrt(tokens.length))
-          let linesCount = Math.ceil(tokens.length/imagesPerLine)
-          let oneImageWidth = 100
-          // reduce this if it doesn't fit
-          if (imagesPerLine*oneImageWidth > MAX_IMAGE_WIDTH) {
-            oneImageWidth = Math.floor(MAX_IMAGE_WIDTH/imagesPerLine)
-          }
-          const imageWidth = imagesPerLine*oneImageWidth
-          const canvas = createCanvas(imagesPerLine*oneImageWidth, linesCount*oneImageWidth)
-          const context = canvas.getContext('2d')
-          context.imageSmoothingEnabled = false
-          let x = 0, y = 0
-          for (let token of tokens) {
-            const imageUrl = `${config.local_image_path}${token.token_id.toString().padStart(4, '0')}.png`
-            const tokenImageData = await this.getImageFile(imageUrl)
-
-            const tokenImage = await loadImage(tokenImageData)
-            logger.info(imageUrl, x, y, oneImageWidth)
-            context.drawImage(tokenImage, x, y, oneImageWidth, oneImageWidth);
-
-            //outputImage.drawImage(tokenImage, x, y)
-            x += oneImageWidth
-            if (x >= imageWidth) {
-              x = 0
-              y += oneImageWidth
+          try {
+            if (!lookupWallet.startsWith('0x')) {
+              // try to find the matching wallet
+              const address = await this.provider.resolveName(`${wallet}`);
+              if (address) lookupWallet = address
             }
+            if (wallet.startsWith('0x')) {
+              // try to lookup a matching ENS name
+              const ens = await this.provider.lookupAddress(`${wallet}`);
+              if (ens) ensisedWallet = ens
+            }
+          } catch (err) {
+            logger.warn(`cannot lookup wallet ${lookupWallet}`)
           }
+          const tokens = await this.getOwnedTokens(lookupWallet)
+          if (!tokens.length) {
+            await interaction.editReply({
+              files: [config.discord_empty_wallet_gifs[Math.floor(Math.random()*config.discord_empty_wallet_gifs.length)]]
+            });     
+          } else {
+            //const tokensUrl = tokens.map((token) => config.discord_owned_tokens_image_path.replace(new RegExp('<tokenId>', 'g'), `${token.token_id}`.padStart(4, '0')))
+            const tokensIds = tokens.map((token) => `#${token.token_id}`)
+            const lastEvent = await this.lastEvent()
 
-          let template = config.ownedTokensMessageDiscord
-          template = template.replace(new RegExp('<wallet>', 'g'), ensisedWallet);
-          template = template.replace(new RegExp('<tokens>', 'g'), tokensIds.join(', '));
-          template = template.replace(new RegExp('<count>', 'g'), tokensIds.length);
-          template = template.replace(new RegExp('<last_event>', 'g'), lastEvent.last_event);
-          template = template.replace(new RegExp('<current_block>', 'g'), `${this.currentBlock}`);
+            // generate an image containing the tokens 
+            const MAX_IMAGE_WIDTH = 1000
+            let imagesPerLine = Math.ceil(Math.sqrt(tokens.length))
+            let linesCount = Math.ceil(tokens.length/imagesPerLine)
+            let oneImageWidth = 100
+            // reduce this if it doesn't fit
+            if (imagesPerLine*oneImageWidth > MAX_IMAGE_WIDTH) {
+              oneImageWidth = Math.floor(MAX_IMAGE_WIDTH/imagesPerLine)
+            }
+            const imageWidth = imagesPerLine*oneImageWidth
+            const canvas = createCanvas(imagesPerLine*oneImageWidth, linesCount*oneImageWidth)
+            const context = canvas.getContext('2d')
+            context.imageSmoothingEnabled = false
+            let x = 0, y = 0
+            for (let token of tokens) {
+              const imageUrl = `${config.local_image_path}${token.token_id.toString().padStart(4, '0')}.png`
+              const tokenImageData = await this.getImageFile(imageUrl)
 
-          await interaction.editReply({
-            content: template,
-            files: [canvas.toBuffer('image/png')]
-          });
+              const tokenImage = await loadImage(tokenImageData)
+              logger.info(imageUrl, x, y, oneImageWidth)
+              context.drawImage(tokenImage, x, y, oneImageWidth, oneImageWidth);
 
+              //outputImage.drawImage(tokenImage, x, y)
+              x += oneImageWidth
+              if (x >= imageWidth) {
+                x = 0
+                y += oneImageWidth
+              }
+            }
+
+            let template = config.ownedTokensMessageDiscord
+            template = template.replace(new RegExp('<wallet>', 'g'), ensisedWallet);
+            template = template.replace(new RegExp('<tokens>', 'g'), tokensIds.join(', '));
+            template = template.replace(new RegExp('<count>', 'g'), tokensIds.length);
+            template = template.replace(new RegExp('<last_event>', 'g'), lastEvent.last_event);
+            template = template.replace(new RegExp('<current_block>', 'g'), `${this.currentBlock}`);
+
+            await interaction.editReply({
+              content: template,
+              files: [canvas.toBuffer('image/png')]
+            });
+          }
         } else if ('graph' === interaction.commandName) {
           await interaction.deferReply()
           const wallet = interaction.options.get('wallet')?.value.toString()
