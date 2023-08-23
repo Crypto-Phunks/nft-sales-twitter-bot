@@ -264,6 +264,7 @@ Amount:   ${'Ξ'+(Math.floor(r.amount*100)/100).toFixed(2)}`)
           const tokens = await this.getOwnedTokens(lookupWallet)
           if (!tokens.length) {
             await interaction.editReply({
+              content: `Empty wallet: ${wallet}`,
               files: [config.discord_empty_wallet_gifs[Math.floor(Math.random()*config.discord_empty_wallet_gifs.length)]]
             });     
           } else {
