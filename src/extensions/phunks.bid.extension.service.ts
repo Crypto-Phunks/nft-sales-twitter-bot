@@ -88,7 +88,7 @@ export class PhunksBidService extends BaseService {
           imageUrl
         }
         const tweet = await this.tweet(request, config.bidMessage);
-        await this.discord(request, tweet.id, config.bidMessageDiscord);
+        await this.discord(request, tweet.id, config.bidMessageDiscord, '#8119B7', 'BID!');
       }
     });
     

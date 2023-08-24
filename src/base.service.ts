@@ -137,7 +137,8 @@ export class BaseService {
       data.platform === 'notlarvalabs' ? 'NLL.png' :
       data.platform === 'phunkauction' ? 'AUCTION.png' :
       data.platform === 'phunkflywheel' ? 'FLYWHEEL.png' :
-      'BLUR.png';
+      data.platform === 'blurio' ? 'BLUR.png' :
+      'ETHERSCAN.png';
     const sentText = this.formatText(data, template)
     const footerText = footerTextParam ?? config.discord_footer_text
     const embed = new MessageEmbed()
