@@ -124,7 +124,7 @@ export class Erc721SalesService extends BaseService {
         const transaction = await this.provider.getTransaction(transactionHash);
         const block = await this.provider.getBlock(transaction.blockNumber)
         const transactionDate = block.date.toISOString()      
-        logger.info(`handling ${transactionHash} token ${tokenId} log ${tx.index} — ${transactionDate}`)
+        logger.info(`handling ${transactionHash} token ${tokenId} log ${tx.index} — ${transactionDate} - from ${tx.blockNumber}`)
         
         const { value } = transaction;
         let ether = ethers.formatEther(value.toString());

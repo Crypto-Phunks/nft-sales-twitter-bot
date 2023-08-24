@@ -8,7 +8,7 @@ export function createLogger(service:string) {
       winston.format.timestamp({
         format: 'YYYY-MM-DD HH:mm:ss'
       }),
-      winston.format.printf(info => `${info.timestamp} ${info.level}: ${info.message}`+(info.splat!==undefined?`${info.splat}`:" "))
+      winston.format.printf(info => `[${info.timestamp}] [${info.service}] [${info.level}]: ${info.message}`+(info.splat!==undefined?`${info.splat}`:" "))
   ),
     defaultMeta: { service },
     transports: [
