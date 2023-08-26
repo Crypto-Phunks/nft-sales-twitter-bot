@@ -153,19 +153,22 @@ export class StatisticsService extends BaseService {
       )
 
     const guildIds = config.discord_guild_ids.split(',')
+    const commands = [
+      status.toJSON(),
+      userStats.toJSON(), 
+      topTraders.toJSON(), 
+      volumeStats.toJSON(), 
+      graphStats.toJSON(), 
+      checkTransaction.toJSON(),
+      indexTransaction.toJSON(),
+      ownedTokens.toJSON() ]
+    if (process.env.DEBUG_MODE === 'true') {
+      commands.push(sample.toJSON())
+    }
     guildIds.forEach(async (guildId) => {
       await rest.put(
         Routes.applicationGuildCommands(config.discord_client_id, guildId),
-        { body: [
-          // sample.toJSON(),
-          status.toJSON(),
-          userStats.toJSON(), 
-          topTraders.toJSON(), 
-          volumeStats.toJSON(), 
-          graphStats.toJSON(), 
-          checkTransaction.toJSON(),
-          indexTransaction.toJSON(),
-          ownedTokens.toJSON()] },
+        { body: commands },
       );    
     })
 
@@ -392,13 +395,16 @@ Amount:   ${'Ξ'+(Math.floor(r.amount*100)/100).toFixed(2)}`)
   }
 
 getOwnedTokens(wallet:string) {
-  const sql = `select distinct token_id from 
+  const sql = `select token_id,
+  ceil(JULIANDAY('now') -
+  JULIANDAY((select max(tx_date) from events e2 where e2.token_id = a.token_id))) owned_since
+  from (select distinct token_id from 
     (select distinct token_id,
     last_value(to_wallet) over ( 
     partition by token_id order by tx_date 
     RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING ) owner
     from events) a
-  where lower(a.owner) = lower(@wallet)`
+  where lower(a.owner) = lower(@wallet)) a`
   const result = this.db.prepare(sql).all({wallet})
   return result
 }
@@ -577,7 +583,7 @@ getOwnedTokens(wallet:string) {
       await delay(500)
       const results = await Promise.all(elements
         .filter(e => e !== undefined)
-        .map(async (e) => this.erc721service.getTransactionDetails(e, true, false)))
+        .map(async (e) => this.erc721service.getTransactionDetails(e, true, false, false)))
       for (let result of results) {
         if (!result) continue
         if (!result.alternateValue && result.ether)

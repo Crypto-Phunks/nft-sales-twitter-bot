@@ -29,7 +29,8 @@ import { PhunksAuctionHouseService } from './extensions/phunks.auction.house.ext
 export class AppModule {
 
   constructor(private saleService:Erc721SalesService) {
-    if (!global.doNotStartAutomatically)
+    if (!global.doNotStartAutomatically) {
       this.saleService.startProvider()
+    }
   }
 }
