@@ -29,6 +29,8 @@ const blurBiddingContractAddress = '0x0000000000a39bb272e79075ade125fd351887ac';
 
 const cargoTopicIdentifier = '0x5535fa724c02f50c6fb4300412f937dbcdf655b0ebd4ecaca9a0d377d0c0d9cc'
 const raribleTopicIdentifier = '0x268820db288a211986b26a8fda86b1e0046281b21206936bb0e61c67b5c79ef4'
+const botMevAddress = '0x00000000000A6D473a66abe3DBAab9E1388223Bd'
+const nftxVaultBeaconProxyAddress = '0xB39185e33E8c28e0BB3DbBCe24DA5dEA6379Ae91'
 
 const looksInterface = new ethers.Interface(looksRareABI);
 const looksInterfaceV2 = new ethers.Interface(looksRareABIv2);
@@ -58,7 +60,7 @@ export class Erc721SalesService extends BaseService {
     
     // Listen for Transfer event
     this.provider.on({ address: config.contract_address, topics: [topics] }, (event) => {
-      this.getTransactionDetails(event).then((res) => {
+      this.getTransactionDetails(event, false, false, true).then((res) => {
         if (!res) return
         // Only tweet transfers with value (Ignore w2w transfers)
         if (res?.ether || res?.alternateValue) this.dispatch(res);
@@ -69,7 +71,7 @@ export class Erc721SalesService extends BaseService {
 
   }
 
-  async getTransactionDetails(tx: any, ignoreENS:boolean=false, ignoreNftxSwaps:boolean=true, ): Promise<any> {
+  async getTransactionDetails(tx: any, ignoreENS:boolean=false, ignoreNftxSwaps:boolean=true, ignoreContracts:boolean=true): Promise<any> {
     // uncomment this to test a specific transaction
     // if (tx.transactionHash !== '0xcee5c725e2234fd0704e1408cdf7f71d881e67f8bf5d6696a98fdd7c0bcf52f3') return;
     
@@ -93,15 +95,14 @@ export class Erc721SalesService extends BaseService {
        
         // ignore internal transfers to contract, another transfer event will handle this 
         // transaction afterward (the one that'll go to the buyer wallet)
-        /*
         const code = await this.provider.getCode(to)
-        we need this for stats
-        if (code !== '0x') {
+        // the ignoreContracts flag make the MEV bots like transaction ignored by the twitter
+        // bot, but not for statistics
+        if (to !== nftxVaultBeaconProxyAddress && code !== '0x' && ignoreContracts) {
           logger.info(`contract detected for ${tx.transactionHash} event index ${tx.index}`)
           return
         }
-        */
-
+        
         // not an erc721 transfer
         if (!tx?.topics[3]) return
 
@@ -323,7 +324,11 @@ export class Erc721SalesService extends BaseService {
             // count the number of tokens transfered
             tokenCount = receipt.logs
             .filter(l => l.address.toLowerCase() === config.contract_address.toLowerCase() && 
-              l.topics[0].toLowerCase() === '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef').length            
+              l.topics[0].toLowerCase() === '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef')
+              .map(l => l.topics[3])
+              // take unique value
+              .filter((value, index, array) => array.indexOf(value) === index)
+              .length
           }
           alternateValue = parseFloat(NFTX[0].toString())/tokenCount/1000;
         } else if (NLL.length) {
