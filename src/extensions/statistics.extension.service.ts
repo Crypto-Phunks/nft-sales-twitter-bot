@@ -374,16 +374,63 @@ Amount:   ${'Ξ'+(Math.floor(r.amount*100)/100).toFixed(2)}`)
           let template = config.globalStatisticsMessageDiscord
           template = template.replace(new RegExp('<last_event>', 'g'), lastEvent.last_event);
           template = template.replace(new RegExp('<window>', 'g'), interaction.options.get('window').value.toString());
-          template = template.replace(new RegExp('<nll_volume>', 'g'), this.getPlatformStats('notlarvalabs', stats));
-          template = template.replace(new RegExp('<lr_volume>', 'g'), this.getPlatformStats('looksrare', stats));
-          template = template.replace(new RegExp('<nftx_volume>', 'g'), this.getPlatformStats('nftx', stats));
-          template = template.replace(new RegExp('<os_volume>', 'g'), this.getPlatformStats('opensea', stats));
-          template = template.replace(new RegExp('<blurio_volume>', 'g'), this.getPlatformStats('blurio', stats));
-          template = template.replace(new RegExp('<x2y2_volume>', 'g'), this.getPlatformStats('x2y2', stats));
-          template = template.replace(new RegExp('<cargo_volume>', 'g'), this.getPlatformStats('cargo', stats));
-          template = template.replace(new RegExp('<rarible_volume>', 'g'), this.getPlatformStats('rarible', stats));
-          template = template.replace(new RegExp('<unknown_volume>', 'g'), this.getPlatformStats('unknown', stats));
-          template = template.replace(new RegExp('<total_volume>', 'g'), totalVolume);
+
+          const platforms = [
+            {
+              key: 'notlarvalabs',
+              templateKey: '<nll_volume>',
+              name: 'Not Larva Labs',
+            },
+            {
+              key: 'looksrare',
+              templateKey: '<lr_volume>',
+              name: 'Looks Rare',
+            },
+            {
+              key: 'nftx',
+              templateKey: '<nftx_volume>',
+              name: 'NFTX',
+            },
+            {
+              key: 'opensea',
+              templateKey: '<os_volume>',
+              name: 'Open Sea',
+            },
+            {
+              key: 'blurio',
+              templateKey: '<blurio_volume>',
+              name: 'Blur IO',
+            },
+            {
+              key: 'x2y2',
+              templateKey: '<x2y2_volume>',
+              name: 'X2Y2',
+            },
+            {
+              key: 'cargo',
+              templateKey: '<cargo_volume>',
+              name: 'Cargo',
+            },
+            {
+              key: 'rarible',
+              templateKey: '<rarible_volume>',
+              name: 'Rarible',
+            },
+            {
+              key: 'unknown',
+              templateKey: '<unknown_volume>',
+              name: 'Unknown',
+            },
+          ]
+          let perPlatformStat = ''
+          for (let platform of platforms) {
+            const result = this.getPlatformStats(platform.key, stats)
+            if (result > '0') {
+              perPlatformStat += `${platform.name.padEnd(17, ' ')} Ξ${result}\n`
+            }
+          }
+          perPlatformStat += `—\nTotal             Ξ${totalVolume}`
+          template = template.replace(new RegExp('<per_platform_stats>', 'g'), perPlatformStat);
           template = template.replace(new RegExp('<current_block>', 'g'), `${this.currentBlock}`);
 
           await interaction.editReply(template);          
