@@ -380,53 +380,66 @@ Amount:   ${'Ξ'+(Math.floor(r.amount*100)/100).toFixed(2)}`)
               key: 'notlarvalabs',
               templateKey: '<nll_volume>',
               name: 'Not Larva Labs',
+              volume: '0'
             },
             {
               key: 'looksrare',
               templateKey: '<lr_volume>',
               name: 'Looks Rare',
+              volume: '0'
             },
             {
               key: 'nftx',
               templateKey: '<nftx_volume>',
               name: 'NFTX',
+              volume: '0'
             },
             {
               key: 'opensea',
               templateKey: '<os_volume>',
               name: 'Open Sea',
+              volume: '0'
             },
             {
               key: 'blurio',
               templateKey: '<blurio_volume>',
               name: 'Blur IO',
+              volume: '0'
             },
             {
               key: 'x2y2',
               templateKey: '<x2y2_volume>',
               name: 'X2Y2',
+              volume: '0'
             },
             {
               key: 'cargo',
               templateKey: '<cargo_volume>',
               name: 'Cargo',
+              volume: '0'
             },
             {
               key: 'rarible',
               templateKey: '<rarible_volume>',
               name: 'Rarible',
+              volume: '0'
             },
             {
               key: 'unknown',
               templateKey: '<unknown_volume>',
               name: 'Unknown',
+              volume: '0'
             },
           ]
           let perPlatformStat = ''
           for (let platform of platforms) {
             const result = this.getPlatformStats(platform.key, stats)
-            if (result > '0') {
-              perPlatformStat += `${platform.name.padEnd(17, ' ')} Ξ${result}\n`
+            platform.volume = result
+          }
+          platforms.sort((p1, p2) => parseFloat(p2.volume) - parseFloat(p1.volume))
+          for (let platform of platforms) {
+            if (platform.volume > '0') {
+              perPlatformStat += `${platform.name.padEnd(17, ' ')} Ξ${platform.volume}\n`
             }
           }
           perPlatformStat += `—\nTotal             Ξ${totalVolume}`
