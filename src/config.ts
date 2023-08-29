@@ -1,3 +1,17 @@
+import { BlurIOBasicParser } from "./parsers/blur.io.basic.parser";
+import { BlurIOSalesParser } from "./parsers/blur.io.sales.parser";
+import { BlurIOSweepParser } from "./parsers/blur.io.sweep.parser";
+import { CargoParser } from "./parsers/cargo.parser";
+import { LooksRareParser } from "./parsers/looksrare.parser";
+import { LooksRareV2Parser } from "./parsers/looksrare.v2.parser";
+import { NFTXParser } from "./parsers/nftx.parser";
+import { NotLarvaLabsParser } from "./parsers/notlarvalabs.parser";
+import { OpenSeaSeaportParser } from "./parsers/opensea.seaport.parser";
+import { OpenSeaWyvernParser } from "./parsers/opensea.wyvern.parser";
+import { LogParser } from "./parsers/parser.definition";
+import { RaribleParser } from "./parsers/rarible.parser";
+import { X2Y2Parser } from "./parsers/x2y2.parser";
+
 export const config = {
   // Contract Address ======================================== //
   contract_address: '0xf07468eAd8cf26c752C676E43C814FEe9c8CF402',
@@ -52,4 +66,19 @@ export const config = {
   // Available Options: ====================================== //
   // true, false ============================================= //
   includeFreeMint: false,
+  gifModuleMentionnedUserId: 1540024208255754241, 
+  parsers: [
+    new BlurIOBasicParser(),
+    new BlurIOSalesParser(),
+    new BlurIOSweepParser(), // must be the last blurio parsers
+    new OpenSeaWyvernParser(),
+    new OpenSeaSeaportParser(),
+    new LooksRareParser(),
+    new LooksRareV2Parser(),
+    new NotLarvaLabsParser(),
+    new X2Y2Parser(),
+    new RaribleParser(),
+    new CargoParser(),
+    new NFTXParser(),
+  ] as LogParser[],
 };
