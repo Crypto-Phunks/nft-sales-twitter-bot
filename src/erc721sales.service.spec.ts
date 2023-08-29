@@ -31,6 +31,51 @@ describe('Erc721SalesService', () => {
     expect(service).toBeDefined()
   });
 
+  it('0x687cb0edb8c70e8d1317158fcf11b6c574786a89de7e8161617c5f12b01d0a67 - wyvern eth', async () => {
+    await delay(COOLDOWN_BETWEEN_TESTS)
+    const provider = service.getWeb3Provider()
+    config.contract_address = '0xf07468eAd8cf26c752C676E43C814FEe9c8CF402'
+    const tokenContract = new ethers.Contract('0xf07468eAd8cf26c752C676E43C814FEe9c8CF402', erc721abi, provider);
+    let filter = tokenContract.filters.Transfer();
+    const startingBlock = 12761067
+    const events = await tokenContract.queryFilter(filter, 
+      startingBlock, 
+      startingBlock+1)
+    const results = await Promise.all(events.map(async (e) => await service.getTransactionDetails(e)))
+    //expect(results[0].alternateValue).toBe(0.31)
+    let logs = ''
+    results.filter(r => r !== undefined).forEach(r => {
+      console.log(r)
+      logs += `${r.tokenId} sold for ${r.alternateValue}\n`
+      expect(r.alternateValue).toBe(0.04)
+      expect(r.platform).toBe('opensea')
+    })
+
+    console.log(logs)
+  })
+
+  it('0x41bdc1e67cea96ede001bc76a48735a69db6e02c16ea823664e8f39f17e6835d - wyvern weth', async () => {
+    await delay(COOLDOWN_BETWEEN_TESTS)
+    const provider = service.getWeb3Provider()
+    config.contract_address = '0xf07468eAd8cf26c752C676E43C814FEe9c8CF402'
+    const tokenContract = new ethers.Contract('0xf07468eAd8cf26c752C676E43C814FEe9c8CF402', erc721abi, provider);
+    let filter = tokenContract.filters.Transfer();
+    const startingBlock = 12815010
+    const events = await tokenContract.queryFilter(filter, 
+      startingBlock, 
+      startingBlock+1)
+    const results = await Promise.all(events.map(async (e) => await service.getTransactionDetails(e)))
+    //expect(results[0].alternateValue).toBe(0.31)
+    let logs = ''
+    results.filter(r => r !== undefined).forEach(r => {
+      console.log(r)
+      logs += `${r.tokenId} sold for ${r.alternateValue}\n`
+      expect(r.alternateValue).toBe(2.0)
+    })
+
+    console.log(logs)
+  })
+
   it('0x5464119779617b8b270bd0defa3cc4aa69661afb71d9360b82ae7247d56aa231  - nftx transaction involving swap', async () => {
     await delay(COOLDOWN_BETWEEN_TESTS)
     const provider = service.getWeb3Provider()

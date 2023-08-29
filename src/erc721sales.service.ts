@@ -11,6 +11,7 @@ import blurABI from './abi/blur.json';
 import blurSalesABI from './abi/blurSales.json';
 import nftxABI from './abi/nftxABI.json';
 import openseaSeaportABI from './abi/seaportABI.json';
+import openseaWyvernABI from './abi/opensea_wyvern.json';
 
 import { config } from './config';
 import { BaseService, TweetRequest } from './base.service';
@@ -38,6 +39,7 @@ const blurInterface = new ethers.Interface(blurABI);
 const blurSalesInterface = new ethers.Interface(blurSalesABI);
 const nftxInterface = new ethers.Interface(nftxABI);
 const seaportInterface = new ethers.Interface(openseaSeaportABI);
+const openseaWyvernInterface = new ethers.Interface(openseaWyvernABI);
 
 // This can be an array if you want to filter by multiple topics
 // 'Transfer' topic
@@ -277,6 +279,21 @@ export class Erc721SalesService extends BaseService {
           receipt.logs.filter(l => l.address.toLowerCase() === blurSalesContractAddressV3.toLowerCase() ||
             l.address.toLowerCase() === blurSalesContractAddressV2.toLowerCase())
         
+        const OPENSEA_WYVERN = receipt.logs.map((log: any) => {
+          if (log.topics[0].toLowerCase() === '0xc4109843e0b7d514e4c093114b863f8e7d8d9a458c372cd51bfe526b588006c9') {
+            const logDescription = openseaWyvernInterface.parseLog(log);
+            const price = logDescription.args.price
+            const tokenCount = receipt.logs
+              .filter(l => l.address.toLowerCase() === config.contract_address.toLowerCase() && 
+                l.topics[0].toLowerCase() === '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef')
+                .map(l => l.topics[3])
+                // take unique value
+                .filter((value, index, array) => array.indexOf(value) === index)
+                .length
+            return price / BigInt(tokenCount) / BigInt('1000000000000000')
+          }
+        }).filter(n => n !== undefined)      
+        
         const OPENSEA_SEAPORT = receipt.logs.map((log: any) => {
           if (log.topics[0].toLowerCase() === '0x9d9af8e38d66c62e2c12f0225249fd9d721c54b83f48d9352c97c6cacdcb6f31') {
             const logDescription = seaportInterface.parseLog(log);
@@ -340,6 +357,9 @@ export class Erc721SalesService extends BaseService {
         } else if (OPENSEA_SEAPORT.length) {
           platform = 'opensea'
           alternateValue = parseFloat(OPENSEA_SEAPORT[0].toString())/1000;
+        } else if (OPENSEA_WYVERN.length) {
+          platform = 'opensea'
+          alternateValue = parseFloat(OPENSEA_WYVERN[0].toString())/1000;
         } else if (BLUR_IO.length) {
           platform = 'blurio'
           const weiValue = (BLUR_IO[0]?.args?.buy.price)?.toString();
