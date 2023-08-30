@@ -39,14 +39,14 @@ export class PhunksAuctionFlywheelService extends BaseService {
 
   async handleEvent(event:any) {
     const { phunkId, minSalePrice, seller, auctionId } = (event as any).args
-    const imageUrl = `${config.local_auction_image_path}${phunkId.padStart(4, '0')}.png`;
+    const imageUrl = `${config.local_auction_image_path}${phunkId.toString().padStart(4, '0')}.png`;
     const value = ethers.formatEther(minSalePrice)
     // If ens is configured, get ens addresses
     let ensTo: string;
     if (config.ens) {
       ensTo = await this.provider.lookupAddress(`${seller}`);
     }
-    const block = await this.provider.getBlock(event.tx.blockNumber)
+    const block = await this.provider.getBlock(event.blockNumber)
     const transactionDate = block.date.toISOString()
 
     const request:TweetRequest = {
