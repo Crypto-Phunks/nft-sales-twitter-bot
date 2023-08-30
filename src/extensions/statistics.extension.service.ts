@@ -643,7 +643,7 @@ getOwnedTokens(wallet:string) {
       await delay(500)
       const results = await Promise.all(elements
         .filter(e => e !== undefined)
-        .map(async (e) => this.erc721service.getTransactionDetails(e, true, false, false)))
+        .map(async (e) => this.erc721service.getTransactionDetails(e, true, false)))
       for (let result of results) {
         if (!result) continue
         if (!result.alternateValue && result.ether)
