@@ -9,7 +9,7 @@ export class OpenSeaWyvernParser implements LogParser {
     
     platform: string = 'opensea';
     
-    parseLogs(transaction:TransactionResponse, logs: Log[], tokenId: string): number {
+    async parseLogs(transaction:TransactionResponse, logs: Log[], tokenId: string): Promise<number> {
         const result = logs.map((log: any) => {
             if (log.topics[0].toLowerCase() === '0xc4109843e0b7d514e4c093114b863f8e7d8d9a458c372cd51bfe526b588006c9') {
               const logDescription = openseaWyvernInterface.parseLog(log);

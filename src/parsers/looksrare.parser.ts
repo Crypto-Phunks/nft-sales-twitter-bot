@@ -10,7 +10,7 @@ export class LooksRareParser implements LogParser {
     
     platform: string = 'looksrare';
     
-    parseLogs(transaction:TransactionResponse, logs: Log[], tokenId: string): number {
+    async parseLogs(transaction:TransactionResponse, logs: Log[], tokenId: string): Promise<number> {
         const result = logs.map((log: any) => {
           if (log.address.toLowerCase() === looksRareContractAddress.toLowerCase()) {  
             return looksInterface.parseLog(log);

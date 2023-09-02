@@ -5,7 +5,7 @@ export class NotLarvaLabsParser implements LogParser {
     
     platform: string = 'notlarvalabs';
     
-    parseLogs(transaction:TransactionResponse, logs: Log[], tokenId: string): number {
+    async parseLogs(transaction:TransactionResponse, logs: Log[], tokenId: string): Promise<number> {
         const result = logs.map((log: any) => {
           if (log.topics[0].toLowerCase() === '0x975c7be5322a86cddffed1e3e0e55471a764ac2764d25176ceb8e17feef9392c') {
             const relevantData = log.data.substring(2);

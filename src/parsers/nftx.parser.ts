@@ -9,7 +9,7 @@ export class NFTXParser implements LogParser {
     
     platform: string = 'nftx';
     
-    parseLogs(transaction:TransactionResponse, logs: Log[], tokenId: string): number {
+    async parseLogs(transaction:TransactionResponse, logs: Log[], tokenId: string): Promise<number> {
         const result = logs.map((log: any) => {
 
           // direct buy from vault

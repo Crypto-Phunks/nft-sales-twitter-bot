@@ -8,7 +8,7 @@ export class CargoParser implements LogParser {
     
     platform: string = 'cargo';
     
-    parseLogs(transaction:TransactionResponse, logs: Log[], tokenId: string): number {
+    async parseLogs(transaction:TransactionResponse, logs: Log[], tokenId: string): Promise<number> {
         const result = logs.map((log: any) => {
           if (log.topics[0] === cargoTopicIdentifier) {
             // cargo sale

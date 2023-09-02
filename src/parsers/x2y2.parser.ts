@@ -9,7 +9,7 @@ export class X2Y2Parser implements LogParser {
     
     platform: string = 'x2y2';
     
-    parseLogs(transaction:TransactionResponse, logs: Log[], tokenId: string): number {
+    async parseLogs(transaction:TransactionResponse, logs: Log[], tokenId: string): Promise<number> {
         const result = logs.map((log: any, index:number) => {
           if (log.topics[0].toLowerCase() === '0x3cbb63f144840e5b1b0a38a7c19211d2e89de4d7c5faf8b2d3c1776c302d1d33') {
             const data = log.data.substring(2);

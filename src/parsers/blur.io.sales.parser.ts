@@ -12,7 +12,7 @@ export class BlurIOSalesParser implements LogParser {
     
     platform: string = 'blurio';
     
-    parseLogs(transaction:TransactionResponse, logs: Log[], tokenId: string): number {
+    async parseLogs(transaction:TransactionResponse, logs: Log[], tokenId: string): Promise<number> {
         const result = logs
         .filter(l => l.address.toLowerCase() === blurBiddingContractAddress.toLowerCase())
         .filter(l => {

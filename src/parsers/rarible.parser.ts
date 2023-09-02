@@ -9,7 +9,7 @@ export class RaribleParser implements LogParser {
     
     platform: string = 'rarible';
     
-    parseLogs(transaction:TransactionResponse, logs: Log[], tokenId: string): number {
+    async parseLogs(transaction:TransactionResponse, logs: Log[], tokenId: string): Promise<number> {
         const result = logs.map((log: any) => {
           if (log.topics[0] === raribleTopicIdentifier ) {
             const nftData = log.data.substring(2);

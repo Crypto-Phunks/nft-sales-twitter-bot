@@ -2,5 +2,5 @@ import { Log, TransactionResponse } from "ethers";
 
 export interface LogParser {
     platform:string
-    parseLogs(transaction:TransactionResponse, logs:ReadonlyArray<Log>, tokenId:string):number|undefined
+    parseLogs(transaction:TransactionResponse, logs:ReadonlyArray<Log>, tokenId:string):Promise<number|undefined>
 }

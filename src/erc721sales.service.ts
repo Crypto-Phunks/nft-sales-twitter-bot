@@ -134,7 +134,7 @@ export class Erc721SalesService extends BaseService {
        
         // Try to use custom parsers
         for (let parser of config.parsers) {
-          const result = parser.parseLogs(transaction, receipt.logs, tokenId)
+          const result = await parser.parseLogs(transaction, receipt.logs, tokenId)
           if (result) {
             tweetRequest.alternateValue = result
             tweetRequest.platform = parser.platform
