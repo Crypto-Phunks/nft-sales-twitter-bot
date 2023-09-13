@@ -15,6 +15,7 @@ import { X2Y2Parser } from "./parsers/x2y2.parser";
 export const config = {
   // Contract Address ======================================== //
   contract_address: '0xf07468eAd8cf26c752C676E43C814FEe9c8CF402',
+  nftx_vault_contract_address: '0xB39185e33E8c28e0BB3DbBCe24DA5dEA6379Ae91',
   // Enter the block where your contract has been created
   statistic_initial_block: 12674389,
   //

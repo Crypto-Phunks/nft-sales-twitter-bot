@@ -12,7 +12,6 @@ import { createLogger } from './logging.utils';
 const logger = createLogger('erc721sales.service')
 
 const botMevAddress = '0x00000000000A6D473a66abe3DBAab9E1388223Bd'
-const nftxVaultBeaconProxyAddress = '0xB39185e33E8c28e0BB3DbBCe24DA5dEA6379Ae91'
 
 
 // This can be an array if you want to filter by multiple topics
@@ -67,7 +66,7 @@ export class Erc721SalesService extends BaseService {
         const code = await this.provider.getCode(to)
         // the ignoreContracts flag make the MEV bots like transaction ignored by the twitter
         // bot, but not for statistics
-        if (to !== nftxVaultBeaconProxyAddress && code !== '0x' && ignoreContracts) {
+        if (to !== config.nftx_vault_contract_address && code !== '0x' && ignoreContracts) {
           logger.info(`contract detected for ${tx.transactionHash} event index ${tx.index}`)
           return
         }
@@ -141,7 +140,12 @@ export class Erc721SalesService extends BaseService {
             break
           }
         }
-
+        
+        if (transaction.to === '0x941A6d105802CCCaa06DE58a13a6F49ebDCD481C' && !tweetRequest.alternateValue) {
+          // nftx swap of "inner token" that weren't bought in the same transaction ignore this
+          logger.info(`nftx swap detected without ETH buy, ignoring ${tx.transactionHash} event index ${tx.index}`)
+          return
+        }
         return tweetRequest
 
       } catch (err) {
