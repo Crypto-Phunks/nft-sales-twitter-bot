@@ -2,8 +2,10 @@ import { Log, TransactionResponse, ethers } from "ethers";
 import { LogParser } from "./parser.definition";
 import { config } from "../config";
 import openseaSeaportABI from '../abi/seaportABI.json';
+import { createLogger } from "../logging.utils";
 
 const seaportInterface = new ethers.Interface(openseaSeaportABI)
+const logger = createLogger('openseaseaport.parser')
 
 export class OpenSeaSeaportParser implements LogParser {
     
@@ -16,6 +18,11 @@ export class OpenSeaSeaportParser implements LogParser {
             const matchingOffers = logDescription.args.offer.filter(
               o => o.identifier.toString() === tokenId || 
               o.identifier.toString() === '0');
+            if (logDescription.args.offer.filter( o => o.identifier.toString() !== '0').length) {
+              // complex opensea trade detected, ignore
+              logger.info(`complex opensea trade detected for ${transaction.hash} log ${log.index}, ignoring...`)
+              return
+            }
             const tokenCount = logDescription.args.offer.length;
             
             if (matchingOffers.length === 0) {

@@ -32,6 +32,30 @@ describe('Erc721SalesService', () => {
   });
 
 
+  it('0x1d0b3582255e00ceffd75cbb9fff119fc719e074fb904147fa012cf9380b4536  - opensea exchange', async () => {
+    await delay(COOLDOWN_BETWEEN_TESTS)
+    const provider = service.getWeb3Provider()
+    config.contract_address = '0xf07468eAd8cf26c752C676E43C814FEe9c8CF402'
+    const tokenContract = new ethers.Contract('0xf07468eAd8cf26c752C676E43C814FEe9c8CF402', erc721abi, provider);
+    let filter = tokenContract.filters.Transfer();
+    const startingBlock = 18129140        
+    const events = await tokenContract.queryFilter(filter, 
+      startingBlock, 
+      startingBlock+1)
+    const results = await Promise.all(events.map(async (e) => await service.getTransactionDetails(e)))
+    //expect(results[0].alternateValue).toBe(0.31)
+    let logs = ''
+    const tweets = results.filter(t => t !== undefined)
+
+    // must be 0 to be ignored
+    tweets.forEach(r => {
+      expect(r.alternateValue).toBe(0)
+      expect(r.ether).toBe(0)
+    })
+    
+    console.log(logs)
+  })
+
   it('0xa13c09a4b0dc88f5e1914aca92675a2f19498d173d0ea2ada5df4652467b9e5b  - nftx transaction involving swap', async () => {
     await delay(COOLDOWN_BETWEEN_TESTS)
     const provider = service.getWeb3Provider()
