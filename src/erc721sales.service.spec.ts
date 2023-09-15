@@ -32,6 +32,29 @@ describe('Erc721SalesService', () => {
   });
 
 
+  it('0xdb1487ac0e684123b22c3259e6971f5592f44c175b9e95b397228aca7330af00  - opensea flagged unknown', async () => {
+    await delay(COOLDOWN_BETWEEN_TESTS)
+    const provider = service.getWeb3Provider()
+    config.contract_address = '0xf07468eAd8cf26c752C676E43C814FEe9c8CF402'
+    const tokenContract = new ethers.Contract('0xf07468eAd8cf26c752C676E43C814FEe9c8CF402', erc721abi, provider);
+    let filter = tokenContract.filters.Transfer();
+    const startingBlock = 18143271        
+    const events = await tokenContract.queryFilter(filter, 
+      startingBlock, 
+      startingBlock+1)
+    const results = await Promise.all(events.map(async (e) => await service.getTransactionDetails(e)))
+    //expect(results[0].alternateValue).toBe(0.31)
+    let logs = ''
+    const tweets = results.filter(t => t !== undefined)
+
+    tweets.forEach(r => {
+      logs += `${r.tokenId} sold for ${r.alternateValue}\n`
+      expect(r.platform).toBe('opensea')
+    })
+    
+    console.log(logs)
+  })
+
   it('0x1d0b3582255e00ceffd75cbb9fff119fc719e074fb904147fa012cf9380b4536  - opensea exchange', async () => {
     await delay(COOLDOWN_BETWEEN_TESTS)
     const provider = service.getWeb3Provider()

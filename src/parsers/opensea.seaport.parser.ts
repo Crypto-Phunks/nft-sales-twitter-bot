@@ -14,15 +14,20 @@ export class OpenSeaSeaportParser implements LogParser {
     parseLogs(transaction:TransactionResponse, logs: Log[], tokenId: string): number {
         const result = logs.map((log: any) => {
           if (log.topics[0].toLowerCase() === '0x9d9af8e38d66c62e2c12f0225249fd9d721c54b83f48d9352c97c6cacdcb6f31') {
+
             const logDescription = seaportInterface.parseLog(log);
-            const matchingOffers = logDescription.args.offer.filter(
-              o => o.identifier.toString() === tokenId || 
-              o.identifier.toString() === '0');
-            if (logDescription.args.offer.filter( o => o.identifier.toString() !== '0').length) {
+            
+            if (logDescription.args.offer.filter( o => o.identifier.toString() !== '0').length && 
+                logDescription.args.consideration.filter( o => o.identifier.toString() !== '0').length) {
               // complex opensea trade detected, ignore
               logger.info(`complex opensea trade detected for ${transaction.hash} log ${log.index}, ignoring...`)
               return
             }
+                        
+            const matchingOffers = logDescription.args.offer.filter(
+              o => o.identifier.toString() === tokenId || 
+              o.identifier.toString() === '0');
+            
             const tokenCount = logDescription.args.offer.length;
             
             if (matchingOffers.length === 0) {
