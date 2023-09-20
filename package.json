@@ -16,7 +16,8 @@
     "start:prod": "node dist/main",
     "start:prod-with-watchdog": "concurrently npm:start:prod --restart-tries -1 --restart-after 5000",
     "test": "jest --runInBand --detectOpenHandles --forceExit && jest-coverage-badges",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "copy:assets": "cpx 'src/extensions/phunks.erc721.specialised.service/fonts/**' 'dist/extensions/phunks.erc721.specialised.service/fonts/' && cpx 'src/extensions/phunks.erc721.specialised.service/images/**' 'dist/extensions/phunks.erc721.specialised.service/images/'"
   },
   "dependencies": {
     "@discordjs/rest": "^2.0.0",
@@ -30,6 +31,7 @@
     "chart.js": "^3.9.1",
     "chartjs-node-canvas": "^4.1.6",
     "concurrently": "^7.2.2",
+    "cpx": "^1.5.0",
     "currency.js": "^2.0.4",
     "date-fns": "^2.30.0",
     "discord-api-types": "^0.37.53",
@@ -44,6 +46,7 @@
     "rimraf": "^3.0.2",
     "rxjs": "^7.2.0",
     "service": "^0.1.4",
+    "svg2img": "^1.0.0-beta.2",
     "twitter-api-v2": "^1.15.0",
     "web3-utils": "^1.7.1",
     "winston": "^3.10.0",
@@ -75,8 +78,8 @@
   },
   "jest": {
     "globals": {
-       "noWatchdog": true,
-       "providerForceHTTPS": true
+      "noWatchdog": true,
+      "providerForceHTTPS": true
     },
     "moduleFileExtensions": [
       "js",

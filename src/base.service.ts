@@ -129,6 +129,7 @@ export class BaseService {
     if (!this.discordClient.setup) return
     if (tweetId) template = template.replace(new RegExp('<tweetLink>', 'g'), `<https://twitter.com/i/web/status/${tweetId}>`);
     const image = config.use_local_images ? data.imageUrl : this.transformImage(data.imageUrl);
+    
     const platformImage = data.platform === 'nftx' ? 'NFTX.png' :
       data.platform === 'opensea' ? 'OPENSEA.png' :
       data.platform === 'looksrare' ? 'LOOKSRARE.png' :
@@ -148,7 +149,10 @@ export class BaseService {
       .setTimestamp()
       .setFooter({ text: footerText, iconURL: 'attachment://platform.png' });
   
-    await this.discordClient.sendEmbed(embed, image, `platform_images/${platformImage}`);
+    let processedImage: Buffer | undefined;
+    if (image) processedImage = await this.getImageFile(image);
+    processedImage = await this.decorateImage(processedImage, data)
+    await this.discordClient.sendEmbed(embed, processedImage, `platform_images/${platformImage}`);
   }
 
   async tweet(data: TweetRequest, template:string=config.saleMessage) {
@@ -160,6 +164,8 @@ export class BaseService {
 
     let processedImage: Buffer | undefined;
     if (image) processedImage = await this.getImageFile(image);
+
+    processedImage = await this.decorateImage(processedImage, data)
 
     let media_id: string;
     if (processedImage) {
@@ -184,6 +190,11 @@ export class BaseService {
       logger.error(errors);
       return null;
     }
+  }
+  
+  async decorateImage(processedImage: Buffer, data:TweetRequest): Promise<Buffer> {
+    // Do nothing but can be overriden by subclasses
+    return processedImage
   }
 
   formatText(data: TweetRequest, template:string) {

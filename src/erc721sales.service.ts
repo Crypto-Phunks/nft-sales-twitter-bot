@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { AbiCoder, TransactionReceipt, ethers } from 'ethers';
 import { hexToNumberString } from 'web3-utils';
+
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -27,6 +28,9 @@ export class Erc721SalesService extends BaseService {
     protected readonly http: HttpService,
   ) {
     super(http)
+    if (!global.doNotStartAutomatically) {
+      this.startProvider()
+    }
   }
   
   startProvider() {
@@ -42,8 +46,7 @@ export class Erc721SalesService extends BaseService {
         // If free mint is enabled we can tweet 0 value
         else if (config.includeFreeMint) this.tweet(res);
       });
-    });
-
+    }); 
   }
 
   async getTransactionDetails(tx: any, ignoreENS:boolean=false, ignoreContracts:boolean=true): Promise<any> {

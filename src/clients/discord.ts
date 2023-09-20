@@ -25,7 +25,8 @@ export default class DiscordClient {
     this.setup = true;
   }
 
-  async sendEmbed(embed: MessageEmbed, image: string, platform: string) {
+
+  async sendEmbed(embed:MessageEmbed, image:string|Buffer, platform:string) {
     this.channels.forEach(async (channel) => {
       await channel.send({
         embeds: [embed],
