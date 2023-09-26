@@ -28,7 +28,7 @@ export class Erc721SalesService extends BaseService {
     protected readonly http: HttpService,
   ) {
     super(http)
-    if (!global.doNotStartAutomatically) {
+    if (!global.doNotStartAutomatically && !config.use_specialized_erc721_service) {
       this.startProvider()
     }
   }

@@ -13,6 +13,9 @@ import { RaribleParser } from "./parsers/rarible.parser";
 import { X2Y2Parser } from "./parsers/x2y2.parser";
 
 export const config = {
+  // Use this if you implemented a custom ERC721 service, so the
+  // main one isn't started
+  use_specialized_erc721_service: true,
   // Contract Address ======================================== //
   contract_address: '0xf07468eAd8cf26c752C676E43C814FEe9c8CF402',
   nftx_vault_contract_address: '0xB39185e33E8c28e0BB3DbBCe24DA5dEA6379Ae91',
