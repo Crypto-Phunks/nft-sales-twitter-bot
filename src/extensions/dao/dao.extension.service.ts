@@ -154,7 +154,6 @@ export class DAOService extends BaseService {
                   const metadata = await this.getTokenMetadata(tokenId, false)
                   const toCheck = metadata.metadata.attributes.filter(a => a.trait_type === conf.specificTrait.traitType)
                   const result = toCheck.length && toCheck[0].value === conf.specificTrait.traitValue
-                  console.log(`result is ${result} for ${tokenId}`)
                   return result ? o : undefined
                 })
                 let r = await Promise.all(matching)
