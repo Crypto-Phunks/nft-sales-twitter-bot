@@ -1,4 +1,4 @@
-<h1>Twitter NFT sales bot</h1>
+<h1>Discord and Twitter NFT sales bot</h1>
 
 [![coverage](https://crypto-phunks.github.io/nft-sales-twitter-bot/badge-lines.svg?update2)](https://crypto-phunks.github.io/nft-sales-twitter-bot/)
  
@@ -72,6 +72,25 @@ block `statistic_initial_block`. Once indexed, the discord bot will reply to the
 - `/transaction <tx>` displays indexed informations about a given transaction, usefull for debugging purpose.
 
 The message templates for each command can be customized through the configuration file.
+
+## DAO module
+
+You can enable the optional DAO module in the `AppModule` definition file `app.module.ts`, it requires
+the statistics module to be enabled as well. When enabled, it will make available commands to let users 
+bind their web3 wallets to their discord account through the `/bind` command ; creating a bridge between 
+web3 ownership tracability and discord community management features.
+
+This binding enable a lot of possibilities:
+
+- The bounded wallets can be used to grant specific roles on the configured discord server, check out the 
+[sample configuration file](https://github.com/Crypto-Phunks/nft-sales-twitter-bot/blob/main/src/config.ts) to see 
+how to grant roles for users owning a token of the collection, for the ones who originally minted the collection, 
+or the ones owning tokens with a specific trait.
+
+- The DAO module includes a voting mechanism that let the discord administrators to create polls for the communities,
+these votes are anonymous and administrable through the `/createpoll <description> <duration> <roles>`, `/pollresults <id>`, 
+and `/listpolls` commands. 
+
 
 ## CLI mode
 

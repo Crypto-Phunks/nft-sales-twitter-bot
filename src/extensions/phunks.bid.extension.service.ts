@@ -45,6 +45,7 @@ export class PhunksBidService extends BaseService {
         platform: 'notlarvalabs',
         initialFrom: from,
         transactionDate,
+        erc20Token: 'ethereum',
         from: ensFrom ?? this.shortenAddress(from),
         tokenId: token,
         ether: parseFloat(value),
@@ -59,8 +60,8 @@ export class PhunksBidService extends BaseService {
     // uncomment this to test the plugin
     return
     tokenContract.queryFilter(filter, 
-      17936542, 
-      17936542).then(async (events:any) => {
+      17987050, 
+      17987050).then(async (events:any) => {
       for (const event of events) {
         if (event?.args.length < 3) return
         const from = event?.args[2];
@@ -79,6 +80,7 @@ export class PhunksBidService extends BaseService {
           eventType: 'bid',
           platform: 'notlarvalabs',
           initialFrom: from,
+          erc20Token: 'ethereum',
           transactionDate,
           from: ensFrom ?? this.shortenAddress(from),
           tokenId: event.args.phunkIndex,

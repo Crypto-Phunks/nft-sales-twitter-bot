@@ -53,6 +53,7 @@ export class PhunksAuctionHouseService extends BaseService {
       eventType: 'sale',
       platform: 'auctionhouse',
       transactionDate,
+      erc20Token: 'ethereum',
       initialFrom: '0x0e7f7d8007c0fccac2a813a25f205b9030697856',
       initialTo: winner,
       from: this.shortenAddress('0x0e7f7d8007c0fccac2a813a25f205b9030697856'),
