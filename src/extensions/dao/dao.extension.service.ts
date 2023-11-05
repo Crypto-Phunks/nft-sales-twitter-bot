@@ -1,7 +1,8 @@
 import { SlashCommandBuilder } from '@discordjs/builders';
+import fetch from "node-fetch";
 import { HttpService } from '@nestjs/axios';
 import { Injectable } from "@nestjs/common";
-import { BaseService } from "src/base.service";
+import { BaseService } from "../../base.service";
 import { createLogger } from "src/logging.utils";
 import Database from 'better-sqlite3'
 import { REST } from '@discordjs/rest';
@@ -138,9 +139,6 @@ export class DAOService extends BaseService {
           for (const m of members) {
             const member = m[1]
             const users = this.getUsersByDiscordUserId(member.id.toString())
-            if (member.id === '550338445885833227') {
-              console.log('a')
-            }
             if (users.length) {
               let conditionSucceeded = false
               if (conf.minOwnedCount) {
@@ -151,13 +149,17 @@ export class DAOService extends BaseService {
                 conditionSucceeded = numberMinted.length > 0
               } else if (conf.specificTrait) {
                 const owned = await statisticsService.getOwnedTokens(users.map(u => u.web3_public_key))
-                const matching = owned.filter(async (o) => {
+                const matching = owned.map(async (o) => {
                   const tokenId = o.token_id.toString().padStart(4, '0')
                   const metadata = await this.getTokenMetadata(tokenId, false)
                   const toCheck = metadata.metadata.attributes.filter(a => a.trait_type === conf.specificTrait.traitType)
-                  return toCheck.length && toCheck[0].value === conf.specificTrait.traitValue
+                  const result = toCheck.length && toCheck[0].value === conf.specificTrait.traitValue
+                  console.log(`result is ${result} for ${tokenId}`)
+                  return result ? o : undefined
                 })
-                conditionSucceeded = matching.length > 0
+                let r = await Promise.all(matching)
+                r = r.filter(o => o !== undefined)
+                conditionSucceeded = r.length > 0
               }
               
               if (conditionSucceeded && !conf.disallowAll) {

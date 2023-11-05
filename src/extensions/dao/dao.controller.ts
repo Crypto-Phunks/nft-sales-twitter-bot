@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
+import fetch from "node-fetch";
 import { BindRequestDto } from './models';
 import { DAOService } from './dao.extension.service';
 import { SignatureError } from './errors';

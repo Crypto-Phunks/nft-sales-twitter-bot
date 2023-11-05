@@ -1,3 +1,7 @@
+import fetch from "node-fetch";
+
+global.fetch = fetch as any
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { Erc721SalesService } from './erc721sales.service';
 import { HttpModule } from '@nestjs/axios';
@@ -12,7 +16,8 @@ describe('Erc721SalesService', () => {
   jest.setTimeout(60000) 
 
   afterAll(() => {
-    service.provider.destroy()
+    if (service && service.getWeb3Provider())
+      service.getWeb3Provider().destroy()
   });
 
   beforeEach(async () => {
@@ -30,8 +35,6 @@ describe('Erc721SalesService', () => {
   it('should be defined', () => {
     expect(service).toBeDefined()
   });
-  
-  return
 
   it('0x7f2f3801e01c10e22ea7d2f2e000b4c3925398f4d744e2a45c84bbe5edf4977e - weth sales seaport', async () => {
     await delay(COOLDOWN_BETWEEN_TESTS)

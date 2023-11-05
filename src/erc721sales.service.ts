@@ -1,4 +1,5 @@
 import erc721abi from './abi/erc721.json';
+import fetch from "node-fetch";
 import { promises as fs } from 'fs';
 import { Injectable } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';

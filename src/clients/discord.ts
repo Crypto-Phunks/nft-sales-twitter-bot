@@ -1,3 +1,4 @@
+import fetch from "node-fetch";
 import { config } from '../config';
 import { Client, MessageAttachment, MessageEmbed, TextChannel } from "discord.js";
 import { Routes } from "discord-api-types/v10";
