@@ -392,5 +392,13 @@ export class BaseService {
     return val ? val : null;
   }
 
+  async updatePosition(position) {
+    await asyncfs.writeFile(this.getPositionFile(), `${position}`)    
+  }
+
+  getPositionFile():string {
+    throw new Error('must be overriden')
+  }
+
 }
 

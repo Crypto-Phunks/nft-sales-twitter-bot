@@ -241,10 +241,6 @@ export class Erc721SalesService extends BaseService {
     return undefined
   }  
 
-  async updatePosition(position) {
-    await fs.writeFile(this.getPositionFile(), `${position}`)    
-  }
-
   getPositionFile() {
     return 'erc721.position.txt'
   }
@@ -261,4 +257,4 @@ export class Erc721SalesService extends BaseService {
 
 function delay(ms: number) {
   return new Promise( resolve => setTimeout(resolve, ms) );
-}  
+}
