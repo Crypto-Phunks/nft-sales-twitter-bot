@@ -42,29 +42,6 @@ describe('Erc721SalesService', () => {
     config.contract_address = '0xf07468eAd8cf26c752C676E43C814FEe9c8CF402'
     const tokenContract = new ethers.Contract('0xf07468eAd8cf26c752C676E43C814FEe9c8CF402', erc721abi, provider);
     let filter = tokenContract.filters.Transfer();
-    const startingBlock = 18049609    
-    const events = await tokenContract.queryFilter(filter, 
-      startingBlock, 
-      startingBlock+1)
-    const results = await Promise.all(events.map(async (e) => await service.getTransactionDetails(e)))
-    //expect(results[0].alternateValue).toBe(0.31)
-    let logs = ''
-    results.forEach(r => {
-      logs += `${r.tokenId} sold for ${r.alternateValue}\n`
-    })
-
-    for (const result of results) {
-      //expect(result.alternateValue).toBe(0.281)
-    }
-    console.log(logs)
-  })
-
-  it('0x7f2f3801e01c10e22ea7d2f2e000b4c3925398f4d744e2a45c84bbe5edf4977e - weth sales seaport', async () => {
-    await delay(COOLDOWN_BETWEEN_TESTS)
-    const provider = service.getWeb3Provider()
-    config.contract_address = '0xf07468eAd8cf26c752C676E43C814FEe9c8CF402'
-    const tokenContract = new ethers.Contract('0xf07468eAd8cf26c752C676E43C814FEe9c8CF402', erc721abi, provider);
-    let filter = tokenContract.filters.Transfer();
     const startingBlock = 18045958    
     const events = await tokenContract.queryFilter(filter, 
       startingBlock, 
@@ -78,6 +55,29 @@ describe('Erc721SalesService', () => {
 
     for (const result of results) {
       expect(result.alternateValue).toBe(0.281)
+    }
+    console.log(logs)
+  })  
+
+  it('0x7f2f3801e01c10e22ea7d2f2e000b4c3925398f4d744e2a45c84bbe5edf4977e - weth sales seaport', async () => {
+    await delay(COOLDOWN_BETWEEN_TESTS)
+    const provider = service.getWeb3Provider()
+    config.contract_address = '0xf07468eAd8cf26c752C676E43C814FEe9c8CF402'
+    const tokenContract = new ethers.Contract('0xf07468eAd8cf26c752C676E43C814FEe9c8CF402', erc721abi, provider);
+    let filter = tokenContract.filters.Transfer();
+    const startingBlock = 18049609    
+    const events = await tokenContract.queryFilter(filter, 
+      startingBlock, 
+      startingBlock+1)
+    const results = await Promise.all(events.map(async (e) => await service.getTransactionDetails(e)))
+    //expect(results[0].alternateValue).toBe(0.31)
+    let logs = ''
+    results.forEach(r => {
+      logs += `${r.tokenId} sold for ${r.alternateValue}\n`
+    })
+
+    for (const result of results) {
+      //expect(result.alternateValue).toBe(0.281)
     }
     console.log(logs)
   })

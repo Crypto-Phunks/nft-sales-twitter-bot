@@ -43,7 +43,7 @@ export class OpenSeaSeaportParser implements LogParser {
             return amount / BigInt('1000000000000000') / BigInt(tokenCount)
           }
         }).filter(n => n !== undefined)  
-        if (result.length) return parseFloat(result[0].toString())/1000;
+        if (result.length) return parseFloat(result.reduce((previous,current) => previous + current, BigInt(0)).toString())/1000;
         return undefined
     }
 
