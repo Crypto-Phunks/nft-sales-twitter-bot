@@ -37,7 +37,7 @@ export default class DiscordClient {
         console.log('logged in', c.user.username)
         const configurationChannels = config.discord_channels.split(',');
         for (let channel of configurationChannels) {
-          console.log(`fetching ${channel}`)
+          //console.log(`fetching ${channel}`)
           channels.push(
             (await client.channels.fetch(channel)) as TextChannel,
           );

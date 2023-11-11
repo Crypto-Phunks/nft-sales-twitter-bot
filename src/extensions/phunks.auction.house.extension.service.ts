@@ -57,7 +57,7 @@ export class PhunksAuctionHouseService extends BaseService {
           continue
         }
 
-        console.log(`checking ${this.currentBlock}`)
+        console.log(`checking (phunk auction module) ${this.currentBlock}`)
         const events = await tokenContract.queryFilter(filter, this.currentBlock, this.currentBlock + CHUNK_SIZE)
 
         for (let event of events) {

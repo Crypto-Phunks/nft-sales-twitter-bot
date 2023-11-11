@@ -270,11 +270,36 @@ export class DAOService extends BaseService {
     }
     logger.info('cleaned grace periods')
   }
+  
   getActivePolls() {
     return this.db.prepare(`
       SELECT * FROM polls
       WHERE until > datetime() AND revealed = FALSE
     `).all()
+  }
+  
+  getPoll(messageId:string) {
+    return this.db.prepare(`
+      SELECT * FROM polls
+      WHERE discord_message_id = :messageId
+    `).get({messageId})
+  }
+
+  async closePoll(messageId:string) {
+    this.db.prepare(`UPDATE polls SET until = DATETIME('now', '-5 minutes')
+      WHERE discord_message_id = @messageId`)
+      .run({messageId: messageId})
+  }
+
+  async deletePoll(messageId:string) {
+    const poll = this.getPoll(messageId)
+    this.db.prepare(`DELETE FROM polls
+      WHERE discord_message_id = @messageId`)
+      .run({messageId: messageId})
+    const channel = await this.discordClient.getClient().channels.cache.get(poll.discord_channel_id) as TextChannel;      
+    const voteMessage = await channel.messages.fetch(messageId)
+    await voteMessage.edit(`Vote deleted.`)
+    await voteMessage.reactions.removeAll()
   }
 
   async handleEndedPolls() {
@@ -405,6 +430,22 @@ export class DAOService extends BaseService {
           .setDescription('The poll ID')
           .setRequired(true))
 
+      const closePoll = new SlashCommandBuilder()
+        .setName('closepoll')
+        .setDescription('Close poll')
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+        .addStringOption(option => option.setName('id')
+          .setDescription('The poll ID')
+          .setRequired(true))          
+
+      const deletePoll = new SlashCommandBuilder()
+        .setName('deletepoll')
+        .setDescription('Delete poll')
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+        .addStringOption(option => option.setName('id')
+          .setDescription('The poll ID')
+          .setRequired(true))          
+
       const listActivePolls = new SlashCommandBuilder()
         .setName('listpolls')
         .setDescription('List active polls')
@@ -419,6 +460,8 @@ export class DAOService extends BaseService {
       bounded.toJSON(),
       createPoll.toJSON(),
       pollResults.toJSON(),
+      closePoll.toJSON(),
+      deletePoll.toJSON(),
       listActivePolls.toJSON()
     ]
     this.getDiscordCommands().push(...commands)
@@ -444,6 +487,20 @@ export class DAOService extends BaseService {
             response += `—\n`
           });
           interaction.editReply(response)
+        } else if ('closepoll' === interaction.commandName) {
+          await interaction.deferReply({ephemeral: true})
+          const messageId = interaction.options.get('id')?.value as string
+          this.closePoll(messageId)
+          const response = `Poll closed.`
+          this.handleEndedPolls()
+          interaction.editReply(response)
+        } else if ('deletepoll' === interaction.commandName) {
+          await interaction.deferReply({ephemeral: true})
+          const messageId = interaction.options.get('id')?.value as string
+          this.deletePoll(messageId)
+          const response = `Poll deleted.`
+          this.handleEndedPolls()
+          interaction.editReply(response)          
         } else if ('pollresults' === interaction.commandName) {
           await interaction.deferReply({ephemeral: true})
           const messageId = interaction.options.get('id')?.value as string

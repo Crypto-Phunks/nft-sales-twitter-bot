@@ -38,16 +38,16 @@ export const providers = [
       rootPath: join(__dirname, '..', 'client'),
     })],
     providers: [
-      //Erc721SalesService,
-      //DAOService,
-      //StatisticsService,
+      Erc721SalesService,
+      DAOService,
+      StatisticsService,
       ////
       // Below is a simple example of how to create and plug a custom 
       // extension to the bot
       ////
       //
       // PhunksBidService,
-      PhunksAuctionHouseService,
+      // PhunksAuctionHouseService,
       // PhunksAuctionFlywheelService, 
       // StatisticsService
     ],
