@@ -59,6 +59,29 @@ describe('Erc721SalesService', () => {
     console.log(logs)
   })  
 
+  it('0x9f8156a2b2d0c5eed11d34e89844ac70f52ac42db84640b01e0df7129ac29fb0 - another weth sales seaport', async () => {
+    await delay(COOLDOWN_BETWEEN_TESTS)
+    const provider = service.getWeb3Provider()
+    config.contract_address = '0xf07468eAd8cf26c752C676E43C814FEe9c8CF402'
+    const tokenContract = new ethers.Contract('0xf07468eAd8cf26c752C676E43C814FEe9c8CF402', erc721abi, provider);
+    let filter = tokenContract.filters.Transfer();
+    const startingBlock = 18555061    
+    const events = await tokenContract.queryFilter(filter, 
+      startingBlock, 
+      startingBlock)
+    const results = await Promise.all(events.map(async (e) => await service.getTransactionDetails(e)))
+    //expect(results[0].alternateValue).toBe(0.31)
+    let logs = ''
+    results.forEach(r => {
+      logs += `${r.tokenId} sold for ${r.alternateValue}\n`
+    })
+
+    for (const result of results) {
+      expect(result.alternateValue).toBe(0.154)
+    }
+    console.log(logs)    
+  })
+
   it('0x7f2f3801e01c10e22ea7d2f2e000b4c3925398f4d744e2a45c84bbe5edf4977e - weth sales seaport', async () => {
     await delay(COOLDOWN_BETWEEN_TESTS)
     const provider = service.getWeb3Provider()
