@@ -384,7 +384,7 @@ export class DAOService extends BaseService {
         // ignored, dm disabled by user
       }
       return
-    }
+    } 
     this.db.prepare(`
       DELETE FROM poll_votes WHERE 
       discord_guild_id = @guildId AND
@@ -400,6 +400,12 @@ export class DAOService extends BaseService {
     stmt.run({
       guildId, messageId, userId, value
     })
+    try {
+      const dm = await member.createDM(true)
+      await dm.send(`Your vote on https://discord.com/channels/${poll.discord_guild_id}/${poll.discord_channel_id}/${poll.discord_message_id} has been recorded`)
+    } catch (err) {
+      // ignored, dm disabled by user
+    }    
   }
 
   async registerCommands() {
@@ -519,7 +525,12 @@ export class DAOService extends BaseService {
           const roleRequired = interaction.options.get('role')?.value as string
           const until = new Date()
           until.setTime(new Date().getTime() + duration*60*60*1000)
-          const message = await channel.send(`🗳️ • An admin just posted a new vote:\n—\n${description}\n—\nReact below to vote until the ${until.toLocaleDateString()} ${until.toLocaleTimeString()}`)
+          //
+          let msg = `🗳️ • An admin just posted a new vote:\n—\n${description}\n—\nReact below to vote until the ${until.toLocaleDateString()} ${until.toLocaleTimeString()}`
+          if (roleRequired) {
+            msg += `\n—\nRole required: <@&${roleRequired}>`
+          }
+          const message = await channel.send(msg)
 
           await message.react('👍')
           await message.react('👎')
