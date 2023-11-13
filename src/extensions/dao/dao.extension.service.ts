@@ -232,7 +232,7 @@ export class DAOService extends BaseService {
       request.discordUserId = encrypt(request.discordUserId, key)
     }
 
-    console.log('request', request)
+    //console.log('request', request)
 
     const stmt = this.db.prepare(`
       INSERT INTO accounts (discord_user_id, discord_username, web3_public_key)
@@ -261,7 +261,7 @@ export class DAOService extends BaseService {
     `)  
     const all = stmt.all()
     for (const row of all) {
-      console.log(row)
+      //console.log(row)
       const guild = await this.discordClient.getClient().guilds.fetch(row.discord_guild_id)
       const member = await guild.members.cache.get(row.discord_user_id)
       const role = await guild.roles.cache.get(row.discord_role_id)
@@ -309,7 +309,7 @@ export class DAOService extends BaseService {
     `)  
     const all = stmt.all()
     for (const row of all) {
-      console.log(row)
+      //console.log(row)
       const votes = this.getPollResults(row.discord_message_id)
       let message = `Vote ended, description: \n> ${row.description}\n\nResults:\n—\n`
       votes.forEach(vote => {
@@ -513,7 +513,7 @@ export class DAOService extends BaseService {
         } else if ('createpoll' === interaction.commandName) {
           await interaction.deferReply()
           const channel = await this.discordClient.getClient().channels.fetch(interaction.channelId) as TextChannel;
-          console.log(`fetched ${interaction.channelId} as ${channel}`)
+          //console.log(`fetched ${interaction.channelId} as ${channel}`)
           const description = interaction.options.get('description')?.value?.toString()
           const duration = interaction.options.get('duration')?.value as number
           const roleRequired = interaction.options.get('role')?.value as string
@@ -553,7 +553,7 @@ export class DAOService extends BaseService {
     let collector = message.createReactionCollector({});
 
     collector.on('collect', async (reaction, user) => {
-      console.log('reaction added', reaction, user);
+      //console.log('reaction added', reaction, user);
       await this.createPollVote(message.guildId, message.id, user.id, reaction.emoji.name)
       await reaction.users.remove(user)
     });
