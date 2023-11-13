@@ -465,7 +465,6 @@ export class DAOService extends BaseService {
       const listActivePolls = new SlashCommandBuilder()
         .setName('listpolls')
         .setDescription('List active polls')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
 
     const bounded = new SlashCommandBuilder()
       .setName('bounded')
@@ -552,7 +551,7 @@ export class DAOService extends BaseService {
           this.bindReactionCollector(message)
 
           const voteId = this.createPoll(interaction.guildId, interaction.channelId, message.id, roleRequired, description, until)
-          interaction.editReply(`Your vote (#${voteId}) has been casted in the current chanel.`)
+          interaction.editReply(`Your vote (#${voteId}) has been casted in the current channel.`)
         } else if ('bounded' === interaction.commandName) {
           await interaction.deferReply({ephemeral: true})
           const users = this.getUsersByDiscordUserId(interaction.user.id.toString())
