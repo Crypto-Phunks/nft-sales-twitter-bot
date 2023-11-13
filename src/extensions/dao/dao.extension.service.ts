@@ -340,6 +340,15 @@ export class DAOService extends BaseService {
     return votesStmt.all({messageId: discord_message_id})
   }
 
+  getDetailedPollResults(discord_message_id: any) {
+    const votesStmt = this.db.prepare(`
+        SELECT * FROM poll_votes
+        WHERE discord_message_id = @messageId
+        group by 1
+      `)  
+    return votesStmt.all({messageId: discord_message_id})
+  }
+
   removeGracePeriod(guildId: string, userId: string, roleId: string) {
     const stmt = this.db.prepare(`
       DELETE FROM grace_periods 
@@ -367,9 +376,10 @@ export class DAOService extends BaseService {
       INSERT INTO polls (discord_guild_id, discord_channel_id, discord_message_id, discord_role_id, description, until, revealed)
       VALUES (@guildId, @channelId, @messageId, @roleId, @description, @until, false)
     `)    
-    stmt.run({
+    const info = stmt.run({
       guildId, channelId, messageId, roleId, description, until: format(until, "yyyy-MM-dd'T'HH:mm:ss'Z'")
     })
+    return info.lastInsertRowid
   }
 
   async createPollVote(guildId:string, messageId:string, userId:string, value:string) {
@@ -513,7 +523,12 @@ export class DAOService extends BaseService {
           const votes = this.getPollResults(messageId)
           let response = `Current results:\n—\n`
           votes.forEach(vote => {
-            response += `${vote.vote_value}\t${vote.count}\n`
+            response += `${vote.vote_value}\t${vote.count}\n\n`
+          });
+          response += `— Detailed votes: —\n\n`
+          const voteDetails = this.getDetailedPollResults(messageId)
+          voteDetails.forEach(vote => {
+            response += `<@${vote.discord_user_id}> ${vote.vote_value} (${vote.voted_at}) \n`
           });
           interaction.editReply(response)
         } else if ('createpoll' === interaction.commandName) {
@@ -536,8 +551,8 @@ export class DAOService extends BaseService {
           await message.react('👎')
           this.bindReactionCollector(message)
 
-          this.createPoll(interaction.guildId, interaction.channelId, message.id, roleRequired, description, until)
-          interaction.editReply(`Your vote has been casted in the current chanel.`)
+          const voteId = this.createPoll(interaction.guildId, interaction.channelId, message.id, roleRequired, description, until)
+          interaction.editReply(`Your vote (#${voteId}) has been casted in the current chanel.`)
         } else if ('bounded' === interaction.commandName) {
           await interaction.deferReply({ephemeral: true})
           const users = this.getUsersByDiscordUserId(interaction.user.id.toString())
