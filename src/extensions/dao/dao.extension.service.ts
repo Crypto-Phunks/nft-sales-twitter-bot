@@ -305,7 +305,7 @@ export class DAOService extends BaseService {
   async handleEndedPolls() {
     const stmt = this.db.prepare(`
       SELECT * FROM polls
-      WHERE until < datetime() AND revealed = FALSE
+      WHERE datetime(until) < datetime() AND revealed = FALSE
     `)  
     const all = stmt.all()
     for (const row of all) {
