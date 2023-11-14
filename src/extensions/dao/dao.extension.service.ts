@@ -315,7 +315,7 @@ export class DAOService extends BaseService {
       votes.forEach(vote => {
         message += `${vote.vote_value}\t${vote.count}\n`
       });
-      message += `—\nVote ID: ${row.discord_message_id}\n`
+      message += `—\nPoll ID: ${row.discord_message_id}\n`
       
       const channel = await this.discordClient.getClient().channels.cache.get(row.discord_channel_id) as TextChannel;
       if (!channel) {
@@ -527,7 +527,7 @@ export class DAOService extends BaseService {
           response += `— Detailed votes: —\n\n`
           const voteDetails = this.getDetailedPollResults(messageId)
           voteDetails.forEach(vote => {
-            response += `<@${vote.discord_user_id}> ${vote.vote_value} (${vote.voted_at}) \n`
+            response += `${vote.vote_value} <@${vote.discord_user_id}> (${vote.voted_at}) \n`
           });
           interaction.editReply(response)
         } else if ('createpoll' === interaction.commandName) {
