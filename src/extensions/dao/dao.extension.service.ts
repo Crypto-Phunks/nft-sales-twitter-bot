@@ -311,11 +311,11 @@ export class DAOService extends BaseService {
     for (const row of all) {
       //console.log(row)
       const votes = this.getPollResults(row.discord_message_id)
-      let message = `Vote ended, description: \n> ${row.description}\n\nResults:\n—\n`
+      let message = `⏰ • Vote ended, description: \n\n> ${row.description}\n\nResults @everyone:\n—\n`
       votes.forEach(vote => {
-        message += `${vote.vote_value}\t${vote.count}\n`
+        message += `${vote.vote_value}\t${vote.count}\n—\n`
       });
-      message += `—\nPoll ID: ${row.discord_message_id}\n`
+      message += `Poll ID: ${row.discord_message_id}\n`
       
       const channel = await this.discordClient.getClient().channels.cache.get(row.discord_channel_id) as TextChannel;
       if (!channel) {
@@ -436,7 +436,7 @@ export class DAOService extends BaseService {
         .setRequired(true))
       .addRoleOption(option => option.setName('role')
         .setDescription('The role required to cast a vote')
-        .setRequired(false))
+        .setRequired(true))
 
       const pollResults = new SlashCommandBuilder()
         .setName('pollresults')
@@ -497,7 +497,7 @@ export class DAOService extends BaseService {
           polls.forEach(poll => {
             response += `Link: https://discord.com/channels/${poll.discord_guild_id}/${poll.discord_channel_id}/${poll.discord_message_id}\n`
             response += `ID: ${poll.discord_message_id}\n`
-            response += `Until: ${poll.until}\n`
+            response += `Until: ${poll.until} UTC\n`
             response += `Description: \n\n> ${poll.description}\n\n`
             response += `—\n`
           });
@@ -522,9 +522,9 @@ export class DAOService extends BaseService {
           const votes = this.getPollResults(messageId)
           let response = `Current results:\n—\n`
           votes.forEach(vote => {
-            response += `${vote.vote_value}\t${vote.count}\n\n`
+            response += `${vote.vote_value}\t${vote.count}\n—\n`
           });
-          response += `— Detailed votes: —\n\n`
+          response += `Detailed votes: \n\n`
           const voteDetails = this.getDetailedPollResults(messageId)
           voteDetails.forEach(vote => {
             response += `${vote.vote_value} <@${vote.discord_user_id}> (${vote.voted_at}) \n`
@@ -540,9 +540,9 @@ export class DAOService extends BaseService {
           const until = new Date()
           until.setTime(new Date().getTime() + duration*60*60*1000)
           //
-          let msg = `🗳️ • An admin just posted a new vote:\n—\n${description}\n—\nReact below to vote until the ${until.toLocaleDateString()} ${until.toLocaleTimeString()}`
+          let msg = `🗳️ • An admin just posted a new vote:\n\n> ${description}\n\nReact below to vote until the ${until.toLocaleDateString()} ${until.toLocaleTimeString()} UTC`
           if (roleRequired) {
-            msg += `\n—\nRole required: <@&${roleRequired}>`
+            msg += `\nRole required: <@&${roleRequired}>`
           }
           const message = await channel.send(msg)
 
@@ -551,7 +551,7 @@ export class DAOService extends BaseService {
           this.bindReactionCollector(message)
 
           const voteId = this.createPoll(interaction.guildId, interaction.channelId, message.id, roleRequired, description, until)
-          interaction.editReply(`Your vote (#${voteId}) has been casted in the current channel.`)
+          interaction.editReply(`**Vote ID #${voteId}**`)
         } else if ('bounded' === interaction.commandName) {
           await interaction.deferReply({ephemeral: true})
           const users = this.getUsersByDiscordUserId(interaction.user.id.toString())
