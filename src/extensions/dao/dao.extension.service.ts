@@ -151,7 +151,7 @@ export class DAOService extends BaseService {
           const members = await guild.members.fetch({ force: true })
           for (const m of members) {
             const member = m[1]
-            logger.info(`checking ${member.displayName} for role ${conf.roleId}`)
+            logger.info(`checking ${member.displayName} for role ${role.name}`)
             const users = this.getUsersByDiscordUserId(member.id.toString()) ?? []
             const twitterUsers = this.getTwitterUsersByDiscordUserId(member.id.toString()) ?? []
 
