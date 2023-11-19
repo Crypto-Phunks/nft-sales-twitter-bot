@@ -331,6 +331,12 @@ export class DAOService extends BaseService {
       WHERE until > datetime() AND revealed = FALSE
     `).all()
   }
+
+  getAllPolls() {
+    return this.db.prepare(`
+      SELECT * FROM polls
+    `).all()
+  }
   
   getPoll(messageId:string) {
     return this.db.prepare(`

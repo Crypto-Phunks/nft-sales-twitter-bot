@@ -17,6 +17,12 @@ export class DAOController {
     return 'ok';
   }
 
+  @Get('polls')
+  polls(): string {
+    const polls = this.daoService.getActivePolls()
+    return polls;
+  }
+
   @Post('bind/twitter')
   bindTwitter(@Body() request: BindTwitterRequestDto): any {
     console.log(request)
