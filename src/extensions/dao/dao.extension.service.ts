@@ -9,7 +9,7 @@ import { REST } from '@discordjs/rest';
 import { config } from '../../config';
 import { PermissionFlagsBits, Routes } from 'discord-api-types/v9'
 import { ethers } from 'ethers';
-import { BindRequestDto } from './models';
+import { BindWeb3RequestDto, BindTwitterRequestDto, BindTwitterResultDto } from './models';
 import { SignatureError } from './errors';
 import { catchError, firstValueFrom } from 'rxjs';
 import { AxiosError } from 'axios';
@@ -17,7 +17,7 @@ import { StatisticsService } from '../statistics.extension.service';
 import { ModuleRef } from '@nestjs/core';
 import { providers } from 'src/app.module';
 import { GuildMember, TextBasedChannel, TextChannel, ClientEvents, Interaction, Message } from 'discord.js';
-import { format } from 'date-fns';
+import { format, formatDistance } from 'date-fns';
 import { unique } from 'src/utils/array.utils';
 import { decrypt, encrypt } from './crypto';
 import { de } from 'date-fns/locale';
@@ -33,6 +33,7 @@ export class DAOService extends BaseService {
   positionCheck: any;
   positionUpdate: any;
   currentBlock: number;
+  currentTwitterAuthRequests: Map<string, any> = new Map<string, any>();
   encryptionKeys: Map<string, string> = new Map<string,string>();
 
   constructor(
@@ -90,6 +91,18 @@ export class DAOService extends BaseService {
       );`,
     ).run();
     this.db.prepare(
+      `CREATE TABLE IF NOT EXISTS twitter_accounts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        discord_user_id text NOT NULL UNIQUE,
+        twitter_user_id text NOT NULL UNIQUE,
+        twitter_created_at text NOT NULL,
+        twitter_name text NOT NULL,
+        twitter_username text NOT NULL,
+        access_token text NOT NULL,
+        refresh_token text
+      );`,
+    ).run();
+    this.db.prepare(
       `CREATE TABLE IF NOT EXISTS polls (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         discord_guild_id text NOT NULL,
@@ -138,15 +151,30 @@ export class DAOService extends BaseService {
           const members = await guild.members.fetch({ force: true })
           for (const m of members) {
             const member = m[1]
-            const users = this.getUsersByDiscordUserId(member.id.toString())
-            if (users.length) {
-              let conditionSucceeded = false
+            logger.info(`checking ${member.displayName} for role ${conf.roleId}`)
+            const users = this.getUsersByDiscordUserId(member.id.toString()) ?? []
+            const twitterUsers = this.getTwitterUsersByDiscordUserId(member.id.toString()) ?? []
+
+            let conditionSucceeded = false            
+            if (users.length || twitterUsers.length) {
               if (conf.minOwnedCount) {
                 const owned = await statisticsService.getOwnedTokens(users.map(u => u.web3_public_key))
                 conditionSucceeded = owned.length >= conf.minOwnedCount
               } else if (conf.minted) {
                 const numberMinted = await statisticsService.getMintedTokens(users.map(u => u.web3_public_key))
                 conditionSucceeded = numberMinted.length > 0
+              } else if (conf.twitter) {
+                conditionSucceeded = true
+                const twitterUser = this.getTwitterUsersByDiscordUserId(member.id.toString())
+                if (!twitterUser.length) conditionSucceeded = false
+                if (conditionSucceeded && conf.twitter.age) {
+                  // check age
+                  const beforeDate = format(new Date().getTime() - conf.twitter.age*1000, "yyyy-MM-dd'T'HH:mm:ss'Z'")
+
+                  if (new Date(beforeDate).getTime() > new Date(twitterUser.twitter_created_at).getTime()) {
+                    conditionSucceeded = false
+                  }
+                }
               } else if (conf.specificTrait) {
                 const owned = await statisticsService.getOwnedTokens(users.map(u => u.web3_public_key))
                 const matching = owned.map(async (o) => {
@@ -160,31 +188,26 @@ export class DAOService extends BaseService {
                 r = r.filter(o => o !== undefined)
                 conditionSucceeded = r.length > 0
               }
-              
-              if (conditionSucceeded && !conf.disallowAll) {
-                console.log(`--> granting ${role.name} to ${member.nickname}`)
-                await member.roles.add(role)  
-              } else {
-                if (member.roles.cache.some(r => r.id === role.id)) {
-                  if (conf.gracePeriod) {
-                    const existingGracePeriod = this.hasGracePeriod(conf.guildId, member.id, conf.roleId)
-                    if (!existingGracePeriod) {
-                      const endAt = format(new Date().getTime() + conf.gracePeriod*1000, "yyyy-MM-dd'T'HH:mm:ss'Z'")
-                      this.setGracePeriod(conf.guildId, member.id, conf.roleId, endAt)
-                    }
-                  } else {
-                    if (conf.gracePeriod) {
-                      this.removeGracePeriod(conf.guildId, member.id, conf.roleId)
-                    }
-                    if (member.roles.cache.some(r => r.id === role.id)) {
-                      await member.roles.remove(role)
-                    }
-                  }
-                }
-              }
+            } 
+            if (conditionSucceeded && !conf.disallowAll) {
+              console.log(`--> granting ${role.name} to ${member.displayName}`)
+              await member.roles.add(role)  
             } else {
               if (member.roles.cache.some(r => r.id === role.id)) {
-                await member.roles.remove(role)
+                if (conf.gracePeriod) {
+                  const existingGracePeriod = this.hasGracePeriod(conf.guildId, member.id, conf.roleId)
+                  if (!existingGracePeriod) {
+                    const endAt = format(new Date().getTime() + conf.gracePeriod*1000, "yyyy-MM-dd'T'HH:mm:ss'Z'")
+                    this.setGracePeriod(conf.guildId, member.id, conf.roleId, endAt)
+                  }
+                } else {
+                  if (conf.gracePeriod) {
+                    this.removeGracePeriod(conf.guildId, member.id, conf.roleId)
+                  }
+                  if (member.roles.cache.some(r => r.id === role.id)) {
+                    await member.roles.remove(role)
+                  }
+                }
               }
             }
           }
@@ -201,8 +224,39 @@ export class DAOService extends BaseService {
       console.warn('cannot grant roles', err)
     }
   }
+  
+  async bindTwitterAccount(request: BindTwitterRequestDto) {
+     const infos = this.currentTwitterAuthRequests.get(request.state)
+     const twitterDatas = await this.twitterClient.finalizeLogin(infos, request)
+     twitterDatas.discordUserId = infos.discord_user_id
 
-  async bindAccount(request: BindRequestDto) {
+    // encrypt datas
+    if (config.dao_requires_encryption_key) {
+      const key = this.encryptionKeys.values().next().value
+      twitterDatas.id = encrypt(twitterDatas.id, key)
+      twitterDatas.accessToken = encrypt(twitterDatas.accessToken, key)
+      twitterDatas.refreshToken = encrypt(twitterDatas.refreshToken, key)
+      twitterDatas.createdAt = encrypt(twitterDatas.createdAt, key)
+      twitterDatas.name = encrypt(twitterDatas.name, key)
+      twitterDatas.username = encrypt(twitterDatas.username, key)
+      twitterDatas.discordUserId = encrypt(twitterDatas.discordUserId, key)
+      twitterDatas.accessToken = encrypt(twitterDatas.accessToken, key)
+      twitterDatas.refreshToken = encrypt(twitterDatas.refreshToken, key)
+    }
+
+    const stmt = this.db.prepare(`
+      INSERT INTO twitter_accounts (discord_user_id, twitter_user_id, twitter_created_at, twitter_name, twitter_username, access_token, refresh_token)
+      VALUES (@discordUserId, @id, @createdAt, @name, @username, @accessToken, @refreshToken)
+      ON CONFLICT(discord_user_id) DO UPDATE 
+      SET discord_user_id = excluded.discord_user_id, twitter_user_id = excluded.twitter_user_id,
+          twitter_created_at = excluded.twitter_created_at, twitter_name = excluded.twitter_name,
+          twitter_username = excluded.twitter_username, refresh_token = excluded.refresh_token,
+          access_token = excluded.access_token
+    `)
+    stmt.run(twitterDatas)
+  }
+
+  async bindWeb3Account(request: BindWeb3RequestDto) {
 
     // TODO check discord account
     const { data } = await firstValueFrom(this.http.get('https://discord.com/api/users/@me', {
@@ -420,10 +474,14 @@ export class DAOService extends BaseService {
 
   async registerCommands() {
     
-    const bind = new SlashCommandBuilder()
-      .setName('bind')
+    const bindWeb3 = new SlashCommandBuilder()
+      .setName('bindweb3')
       .setDescription('Bind your web3 wallet to your discord account')
     
+    const bindTwitter = new SlashCommandBuilder()
+      .setName('bindtwitter')
+      .setDescription('Bind your twitter account to your discord account')
+  
     const createPoll = new SlashCommandBuilder()
       .setName('createpoll')
       .setDescription('Create a new poll')
@@ -468,10 +526,11 @@ export class DAOService extends BaseService {
 
     const bounded = new SlashCommandBuilder()
       .setName('bounded')
-      .setDescription('Show the currently web3 wallet bounded to your discord account')
+      .setDescription('Show the web3 wallets and social accounts bounded to your discord account')
 
     const commands = [
-      bind.toJSON(),
+      bindTwitter.toJSON(),
+      bindWeb3.toJSON(),
       bounded.toJSON(),
       createPoll.toJSON(),
       pollResults.toJSON(),
@@ -484,12 +543,23 @@ export class DAOService extends BaseService {
     const listener = async (interaction:Interaction) => {
       try {
         if (!interaction.isCommand()) return;
-        if ('bind' === interaction.commandName) {
+        if ('bindweb3' === interaction.commandName) {
           await interaction.deferReply({ephemeral: true})
           if (config.dao_requires_encryption_key && !this.encryptionKeys.has(interaction.guildId)) {
             interaction.editReply(`Please ask the admin to setup the encryption key first`)
           }          
           interaction.editReply(`Click here to bind your wallet: http://${config.daoModuleListenAddress}/`)
+        } else if ('bindtwitter' === interaction.commandName) {
+          await interaction.deferReply({ephemeral: true})
+
+          const result = await this.twitterClient.startLogin() as any
+          result.discord_user_id = interaction.member.user.id
+          this.currentTwitterAuthRequests.set(result.state, result)
+               
+          if (config.dao_requires_encryption_key && !this.encryptionKeys.has(interaction.guildId)) {
+            interaction.editReply(`Please ask the admin to setup the encryption key first`)
+          }          
+          interaction.editReply(`Click here to bind your twitter account: ${result.url}`)
         } else if ('listpolls' === interaction.commandName) {
           await interaction.deferReply({ephemeral: true})
           const polls = this.getActivePolls()
@@ -555,15 +625,26 @@ export class DAOService extends BaseService {
         } else if ('bounded' === interaction.commandName) {
           await interaction.deferReply({ephemeral: true})
           const users = this.getUsersByDiscordUserId(interaction.user.id.toString())
+          const twitterUser = this.getTwitterUsersByDiscordUserId(interaction.user.id.toString())
+          let response = ``
           if (users.length) {
-            let response = `Currently bound web3 wallet(s): \n`
+            response += `Currently bound web3 wallet(s): \n`
             response += '```'
             for (const u of users) response += `${u.web3_public_key} \n`
             response += '```\n'
-            interaction.editReply(response)
+          } else {
+            response += `No web3 wallet bounded yet.\n—\n`
           }
-          else 
-            interaction.editReply(`No wallet bounded yet.`)
+          if (twitterUser.length) {
+            response += `Currently bound twitter account: \n`
+            for (const u of twitterUser) {
+              const age = formatDistance(new Date(u.twitter_created_at), new Date(), { addSuffix: true })
+              response += `https://twitter.com/${u.twitter_username} (created ${age}) \n`
+            }
+          } else {
+            response += `No twitter account bounded yet.\n`
+          }
+          interaction.editReply(response)
         }
       } catch (err) {
         logger.error(err)
@@ -600,6 +681,31 @@ export class DAOService extends BaseService {
         row.discord_user_id = decrypt(row.discord_user_id, key)
         row.discord_username = decrypt(row.discord_username, key)
         row.web3_public_key = decrypt(row.web3_public_key, key)
+      }
+    }
+    return rows
+  }
+
+  getTwitterUsersByDiscordUserId(id: string) {
+    if (config.dao_requires_encryption_key) {
+      // TODO handle guild id
+      const key = this.encryptionKeys.values().next().value
+      id = encrypt(id, key)
+    }
+    const rows = this.db.prepare(`
+      SELECT * FROM twitter_accounts WHERE discord_user_id = @id
+    `).all({id})
+    if (config.dao_requires_encryption_key) {
+      // TODO handle guild id
+      const key = this.encryptionKeys.values().next().value
+      for (const row of rows) {
+        row.discord_user_id = decrypt(row.discord_user_id, key)
+        row.twitter_user_id = decrypt(row.twitter_user_id, key)
+        row.twitter_created_at = decrypt(row.twitter_created_at, key)
+        row.twitter_name = decrypt(row.twitter_name, key)
+        row.twitter_username = decrypt(row.twitter_username, key)
+        row.access_token = decrypt(row.access_token, key)
+        row.refresh_token = decrypt(row.refresh_token, key)
       }
     }
     return rows

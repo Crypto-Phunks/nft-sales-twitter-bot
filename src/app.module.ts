@@ -52,7 +52,7 @@ export const providers = [
       // StatisticsService
     ],
     controllers: [
-      // DAOController
+      DAOController
     ],
 })
 
