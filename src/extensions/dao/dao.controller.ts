@@ -19,7 +19,7 @@ export class DAOController {
 
   @Get('polls')
   polls(): string {
-    const polls = this.daoService.getActivePolls()
+    const polls = this.daoService.getAllPolls()
     return polls;
   }
 
