@@ -151,7 +151,7 @@ export class DAOService extends BaseService {
           const members = await guild.members.fetch({ force: true })
           for (const m of members) {
             const member = m[1]
-            logger.info(`checking ${member.displayName} for role ${role.name}`)
+            // logger.info(`checking ${member.displayName} for role ${role.name}`)
             const users = this.getUsersByDiscordUserId(member.id.toString()) ?? []
             const twitterUsers = this.getTwitterUsersByDiscordUserId(member.id.toString()) ?? []
 
@@ -371,11 +371,11 @@ export class DAOService extends BaseService {
     for (const row of all) {
       //console.log(row)
       const votes = this.getPollResults(row.discord_message_id)
-      let message = `Vote ended, description: \n> ${row.description}\n\nResults:\n—\n`
+      let message = `\n———\n⏰ • Vote ended, description: \n\n> ${row.description}\n\nResults @everyone:\n———\n`
       votes.forEach(vote => {
-        message += `${vote.vote_value}\t${vote.count}\n`
+        message += `${vote.vote_value}\t${vote.count}\n———\n`
       });
-      message += `—\nPoll ID: ${row.discord_message_id}\n`
+      message += `Poll ID: ${row.discord_message_id}\n`
       
       const channel = await this.discordClient.getClient().channels.cache.get(row.discord_channel_id) as TextChannel;
       if (!channel) {
@@ -449,7 +449,7 @@ export class DAOService extends BaseService {
     if (poll.discord_role_id && !member.roles.cache.has(poll.discord_role_id)) {
       try {
         const dm = await member.createDM(true)
-        await dm.send("You don't have the required role to vote on this poll")
+        await dm.send("You don't have the required role to vote on this poll.")
       } catch (err) {
         // ignored, dm disabled by user
       }
@@ -472,7 +472,7 @@ export class DAOService extends BaseService {
     })
     try {
       const dm = await member.createDM(true)
-      await dm.send(`Your vote on https://discord.com/channels/${poll.discord_guild_id}/${poll.discord_channel_id}/${poll.discord_message_id} has been recorded`)
+      await dm.send(`Your vote on https://discord.com/channels/${poll.discord_guild_id}/${poll.discord_channel_id}/${poll.discord_message_id} has been recorded.`)
     } catch (err) {
       // ignored, dm disabled by user
     }    
@@ -554,7 +554,7 @@ export class DAOService extends BaseService {
           if (config.dao_requires_encryption_key && !this.encryptionKeys.has(interaction.guildId)) {
             interaction.editReply(`Please ask the admin to setup the encryption key first`)
           }          
-          interaction.editReply(`Click here to bind your wallet: http://${config.daoModuleListenAddress}/`)
+          interaction.editReply(`[**Click here to bind your wallet.**](https://${config.daoModuleListenAddress}/)`)
         } else if ('bindtwitter' === interaction.commandName) {
           await interaction.deferReply({ephemeral: true})
 
@@ -565,17 +565,17 @@ export class DAOService extends BaseService {
           if (config.dao_requires_encryption_key && !this.encryptionKeys.has(interaction.guildId)) {
             interaction.editReply(`Please ask the admin to setup the encryption key first`)
           }          
-          interaction.editReply(`Click here to bind your twitter account: ${result.url}`)
+          interaction.editReply(`[**Click here to bind your twitter account.**](${result.url})`)
         } else if ('listpolls' === interaction.commandName) {
           await interaction.deferReply({ephemeral: true})
           const polls = this.getActivePolls()
-          let response = `Active polls: \n—\n`
+          let response = `**Active polls:**\n———\n`
           polls.forEach(poll => {
-            response += `Link: https://discord.com/channels/${poll.discord_guild_id}/${poll.discord_channel_id}/${poll.discord_message_id}\n`
-            response += `ID: ${poll.discord_message_id}\n`
-            response += `Until: ${poll.until}\n`
-            response += `Description: \n\n> ${poll.description}\n\n`
-            response += `—\n`
+            response += `\n**Description:**\n\n> ${poll.description}\n\n`
+            response += `Active until: ${poll.until} UTC\n`
+            response += `Poll ID: ${poll.discord_message_id}\n`
+            response += `🗳️ • [**Vote Here!**](<https://discord.com/channels/${poll.discord_guild_id}/${poll.discord_channel_id}/${poll.discord_message_id}>)\n\n`
+            response += `———\n`
           });
           interaction.editReply(response)
         } else if ('closepoll' === interaction.commandName) {
@@ -596,11 +596,11 @@ export class DAOService extends BaseService {
           await interaction.deferReply({ephemeral: true})
           const messageId = interaction.options.get('id')?.value as string
           const votes = this.getPollResults(messageId)
-          let response = `Current results:\n—\n`
+          let response = `Current results:\n———\n`
           votes.forEach(vote => {
-            response += `${vote.vote_value}\t${vote.count}\n\n`
+            response += `${vote.vote_value}\t${vote.count}\n———\n`
           });
-          response += `— Detailed votes: —\n\n`
+          response += `Detailed votes: \n\n`
           const voteDetails = this.getDetailedPollResults(messageId)
           voteDetails.forEach(vote => {
             response += `${vote.vote_value} <@${vote.discord_user_id}> (${vote.voted_at}) \n`
@@ -616,9 +616,9 @@ export class DAOService extends BaseService {
           const until = new Date()
           until.setTime(new Date().getTime() + duration*60*60*1000)
           //
-          let msg = `🗳️ • An admin just posted a new vote:\n—\n${description}\n—\nReact below to vote until the ${until.toLocaleDateString()} ${until.toLocaleTimeString()}`
+          let msg = `\n———\n🗳️ • An admin just posted a new vote:\n\n> ${description}\n\nReact below to vote until the ${until.toLocaleDateString()} ${until.toLocaleTimeString()} UTC`
           if (roleRequired) {
-            msg += `\n—\nRole required: <@&${roleRequired}>`
+            msg += `\nRole required: <@&${roleRequired}>\n———\n`
           }
           const message = await channel.send(msg)
 
@@ -627,28 +627,28 @@ export class DAOService extends BaseService {
           this.bindReactionCollector(message)
 
           const voteId = this.createPoll(interaction.guildId, interaction.channelId, message.id, roleRequired, description, until)
-          interaction.editReply(`Your vote (#${voteId}) has been casted in the current channel.`)
+          interaction.editReply(`**Vote ID #${voteId}**`)
         } else if ('bounded' === interaction.commandName) {
           await interaction.deferReply({ephemeral: true})
           const users = this.getUsersByDiscordUserId(interaction.user.id.toString())
           const twitterUser = this.getTwitterUsersByDiscordUserId(interaction.user.id.toString())
           let response = ``
           if (users.length) {
-            response += `Currently bound web3 wallet(s): \n`
-            response += '```'
+            response += `\n———\n\nCurrently bound web3 wallet(s): \n`
+            response += '```fix\n'
             for (const u of users) response += `${u.web3_public_key} \n`
-            response += '```\n'
+            response += '```\n———\n\n'
           } else {
-            response += `No web3 wallet bounded yet.\n—\n`
+            response += `No web3 wallet bounded yet. Run /bindweb3 command. \n\n———\n`
           }
           if (twitterUser.length) {
             response += `Currently bound twitter account: \n`
             for (const u of twitterUser) {
               const age = formatDistance(new Date(u.twitter_created_at), new Date(), { addSuffix: true })
-              response += `https://twitter.com/${u.twitter_username} (created ${age}) \n`
+              response += `https://twitter.com/${u.twitter_username} (created ${age}) \n\n———\n`
             }
           } else {
-            response += `No twitter account bounded yet.\n`
+            response += `No twitter account bounded yet. Run /bindtwitter command. \n\n———\n`
           }
           interaction.editReply(response)
         }
