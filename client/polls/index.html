@@ -32,9 +32,9 @@
 
         <script id="poll-template" type="x-tmpl-mustache">
             {{#datas}}
-            <h2>Poll #{{ discord_message_id }}</h2>
+            <h2 style="margin-top: 50px">Poll #{{ id }}</h2>
             <p>{{ description }}</p>
-            <div>
+            <div style="margin-bottom: 40px">
                 {{#formatDate}}{{ until }}{{/formatDate}} ({{until}} UTC)
                 — <a href="https://discord.com/channels/{{ discord_guild_id }}/{{ discord_channel_id }}/{{ poll.discord_message_id }}">[discord link]</a>
             </div>

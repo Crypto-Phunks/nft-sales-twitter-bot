@@ -334,7 +334,7 @@ export class DAOService extends BaseService {
 
   getAllPolls() {
     return this.db.prepare(`
-      SELECT * FROM polls
+      SELECT * FROM polls ORDER BY until DESC
     `).all()
   }
   
@@ -572,7 +572,7 @@ export class DAOService extends BaseService {
           let response = `**Active polls:**\n———\n`
           polls.forEach(poll => {
             response += `\n**Description:**\n\n> ${poll.description}\n\n`
-            response += `Active until: ${poll.until} UTC\n`
+            response += `Active until: ${poll.until} UTC — <t:${Math.round(new Date(poll.until).getTime()/1000)}:R>\n`
             response += `Poll ID: ${poll.discord_message_id}\n`
             response += `🗳️ • [**Vote Here!**](<https://discord.com/channels/${poll.discord_guild_id}/${poll.discord_channel_id}/${poll.discord_message_id}>)\n\n`
             response += `———\n`
@@ -616,7 +616,7 @@ export class DAOService extends BaseService {
           const until = new Date()
           until.setTime(new Date().getTime() + duration*60*60*1000)
           //
-          let msg = `\n———\n🗳️ • An admin just posted a new vote:\n\n> ${description}\n\nReact below to vote until the ${until.toLocaleDateString()} ${until.toLocaleTimeString()} UTC`
+          let msg = `\n———\n🗳️ • An admin just posted a new vote:\n\n> ${description}\n\nReact below to vote until the ${until.toLocaleDateString()} ${until.toLocaleTimeString()} UTC  — <t:${Math.round(new Date(until).getTime()/1000)}:R>`
           if (roleRequired) {
             msg += `\nRole required: <@&${roleRequired}>\n———\n`
           }
