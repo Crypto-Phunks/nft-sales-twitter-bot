@@ -199,6 +199,7 @@ export class DAOService extends BaseService {
             if (conditionSucceeded && !conf.disallowAll) {
               console.log(`--> granting ${role.name} to ${member.displayName}`)
               await member.roles.add(role)  
+              this.removeGracePeriod(conf.guildId, member.id, conf.roleId)
             } else {
               if (member.roles.cache.some(r => r.id === role.id)) {
                 if (conf.gracePeriod) {
