@@ -28,6 +28,7 @@ export interface DAORoleConfigurationDto {
     twitter?:any,
     minted?: boolean,
     minOwnedCount?: number,
+    minOwnedTime?: number,
     specificTrait?: any,
     disallowAll?: boolean
 }

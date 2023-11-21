@@ -160,6 +160,13 @@ export class DAOService extends BaseService {
               if (conf.minOwnedCount) {
                 const owned = await statisticsService.getOwnedTokens(users.map(u => u.web3_public_key))
                 conditionSucceeded = owned.length >= conf.minOwnedCount
+                if (conditionSucceeded && conf.minOwnedTime) {
+                  const maxOwnedTime = Math.min(...owned.map(o => o.owned_since))
+                  
+                  if (maxOwnedTime < conf.minOwnedTime) {
+                    conditionSucceeded = false
+                  }
+                }
               } else if (conf.minted) {
                 const numberMinted = await statisticsService.getMintedTokens(users.map(u => u.web3_public_key))
                 conditionSucceeded = numberMinted.length > 0

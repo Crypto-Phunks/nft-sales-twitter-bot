@@ -26,14 +26,16 @@ export const config = {
   discord_guild_ids: '880485569652740136,968448656221011978',
   dao_requires_encryption_key: false,
   dao_roles: [
-    /*
+    
     {
       guildId: '880485569652740136',
       roleId: '1157766800629563452',
       gracePeriod: 60*60*24, // in seconds (1 day)
       minOwnedCount: 1,
+      minOwnedTime: 30, // in days
       disallowAll: false,
     },
+/*
     {
       guildId: '880485569652740136',
       roleId: '1158041885454127284',
@@ -48,6 +50,7 @@ export const config = {
       }
     },
     */
+   /*
     {
       guildId: '880485569652740136',
       roleId: '1175862565490921542',
@@ -56,6 +59,7 @@ export const config = {
         age: 60*60*24*30, // in seconds (1 month)
       }
     }
+    */
   ] as DAORoleConfigurationDto[],
   discord_empty_wallet_gifs: ['https://media.tenor.com/J3mNIbj6A4wAAAAd/empty-shelves-john-travolta.gif', 'https://media.tenor.com/NteLNqDJB2QAAAAd/out-of-stock-this-is-happening.gif'],
   //
