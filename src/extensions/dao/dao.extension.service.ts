@@ -638,7 +638,7 @@ export class DAOService extends BaseService {
           }
           const message = await channel.send(msg)
 
-          const allowedEmojis = interaction.options.get('emojis')?.value as string ?? '👍👎'
+          const allowedEmojis = interaction.options.get('emojis')?.value as string ?? '👍 👎'
           const emojis = Array.from(allowedEmojis)
 
           for (let i=0; i < emojis.length; i+=2) { 
