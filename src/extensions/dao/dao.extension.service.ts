@@ -111,7 +111,8 @@ export class DAOService extends BaseService {
         discord_role_id text,
         description text NOT NULL,
         until text NOT NULL,
-        revealed boolean NOT NULL
+        revealed boolean NOT NULL,
+        allowed_emojis text NOT NULL
       );`,
     ).run();
     this.db.prepare(
@@ -439,19 +440,23 @@ export class DAOService extends BaseService {
     })
   }
 
-  createPoll(guildId:string, channelId:string, messageId:string, roleId:string, description:string, until:Date) {
+  createPoll(guildId:string, channelId:string, messageId:string, roleId:string, description:string, until:Date, allowedEmojis:string) {
     const stmt = this.db.prepare(`
-      INSERT INTO polls (discord_guild_id, discord_channel_id, discord_message_id, discord_role_id, description, until, revealed)
-      VALUES (@guildId, @channelId, @messageId, @roleId, @description, @until, false)
+      INSERT INTO polls (discord_guild_id, discord_channel_id, discord_message_id, discord_role_id, description, until, revealed, allowed_emojis)
+      VALUES (@guildId, @channelId, @messageId, @roleId, @description, @until, false, @allowedEmojis)
     `)    
     const info = stmt.run({
-      guildId, channelId, messageId, roleId, description, until: format(until, "yyyy-MM-dd'T'HH:mm:ss'Z'")
+      guildId, channelId, messageId, roleId, description, until: format(until, "yyyy-MM-dd'T'HH:mm:ss'Z'"), allowedEmojis
     })
     return info.lastInsertRowid
   }
 
   async createPollVote(guildId:string, messageId:string, userId:string, value:string) {
     const poll = this.db.prepare(`SELECT * FROM polls WHERE discord_message_id = @messageId`).get({messageId})
+    if (poll.allowed_emojis.indexOf(value) === -1) {
+      console.log('not an allowed emoji')
+      return
+    }
     const guild = this.discordClient.getClient().guilds.cache.get(guildId)
     const member = await guild.members.cache.get(userId)
     if (poll.discord_role_id && !member.roles.cache.has(poll.discord_role_id)) {
@@ -508,6 +513,9 @@ export class DAOService extends BaseService {
         .setRequired(true))
       .addRoleOption(option => option.setName('role')
         .setDescription('The role required to cast a vote')
+        .setRequired(false))
+      .addStringOption(option => option.setName('emojis')
+        .setDescription('The allowed emojis')
         .setRequired(false))
 
       const pollResults = new SlashCommandBuilder()
@@ -630,11 +638,15 @@ export class DAOService extends BaseService {
           }
           const message = await channel.send(msg)
 
-          await message.react('👍')
-          await message.react('👎')
+          const allowedEmojis = interaction.options.get('emojis')?.value as string ?? '👍👎'
+          const emojis = Array.from(allowedEmojis)
+
+          for (let i=0; i < emojis.length; i+=2) { 
+            await message.react(emojis[i])
+          }
           this.bindReactionCollector(message)
 
-          const voteId = this.createPoll(interaction.guildId, interaction.channelId, message.id, roleRequired, description, until)
+          const voteId = this.createPoll(interaction.guildId, interaction.channelId, message.id, roleRequired, description, until, allowedEmojis)
           interaction.editReply(`**Vote ID #${voteId}**`)
         } else if ('bounded' === interaction.commandName) {
           await interaction.deferReply({ephemeral: true})
