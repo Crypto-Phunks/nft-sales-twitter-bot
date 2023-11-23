@@ -188,8 +188,13 @@ export class DAOService extends BaseService {
                 const matching = owned.map(async (o) => {
                   const tokenId = o.token_id.toString().padStart(4, '0')
                   const metadata = await this.getTokenMetadata(tokenId, false)
-                  const toCheck = metadata.metadata.attributes.filter(a => a.trait_type === conf.specificTrait.traitType)
-                  const result = toCheck.length && toCheck[0].value === conf.specificTrait.traitValue
+                  let result = false
+                  if (conf.specificTrait.traitType) {
+                    const toCheck = metadata.metadata.attributes.filter(a => a.trait_type === conf.specificTrait.traitType)
+                    result = toCheck.length && toCheck[0].value === conf.specificTrait.traitValue
+                  } else if (conf.specificTrait.count > 0) {
+                    result = metadata.metadata.attributes.length >= conf.specificTrait.count
+                  }
                   return result ? o : undefined
                 })
                 let r = await Promise.all(matching)
