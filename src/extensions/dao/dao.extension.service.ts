@@ -16,11 +16,12 @@ import { AxiosError } from 'axios';
 import { StatisticsService } from '../statistics.extension.service';
 import { ModuleRef } from '@nestjs/core';
 import { providers } from 'src/app.module';
-import { GuildMember, TextBasedChannel, TextChannel, ClientEvents, Interaction, Message } from 'discord.js';
-import { format, formatDistance } from 'date-fns';
+import { GuildMember, TextBasedChannel, TextChannel, ClientEvents, Interaction, Message, MessageEmbed, HexColorString } from 'discord.js';
+import { format, formatDistance, parseISO } from 'date-fns';
 import { unique } from 'src/utils/array.utils';
 import { decrypt, encrypt } from './crypto';
 import { de } from 'date-fns/locale';
+import { utcToZonedTime } from 'date-fns-tz';
 
 const logger = createLogger('dao.extension.service')
 
@@ -112,7 +113,9 @@ export class DAOService extends BaseService {
         description text NOT NULL,
         until text NOT NULL,
         revealed boolean NOT NULL,
-        allowed_emojis text NOT NULL
+        allowed_emojis text NOT NULL,
+        minimum_votes_required number,
+        link text
       );`,
     ).run();
     this.db.prepare(
@@ -390,6 +393,9 @@ export class DAOService extends BaseService {
         message += `${vote.vote_value}\t${vote.count}\n———\n`
       });
       message += `Poll ID: ${row.discord_message_id}\n`
+      if (row.minimum_votes_required > 0) {
+        message += `Minimum votes required was: ${row.minimum_votes_required}\n`
+      }
       
       const channel = await this.discordClient.getClient().channels.cache.get(row.discord_channel_id) as TextChannel;
       if (!channel) {
@@ -445,13 +451,13 @@ export class DAOService extends BaseService {
     })
   }
 
-  createPoll(guildId:string, channelId:string, messageId:string, roleId:string, description:string, until:Date, allowedEmojis:string) {
+  createPoll(guildId:string, channelId:string, messageId:string, roleId:string, description:string, until:Date, allowedEmojis:string, minimumVotesRequired:number, link:string) {
     const stmt = this.db.prepare(`
-      INSERT INTO polls (discord_guild_id, discord_channel_id, discord_message_id, discord_role_id, description, until, revealed, allowed_emojis)
-      VALUES (@guildId, @channelId, @messageId, @roleId, @description, @until, false, @allowedEmojis)
+      INSERT INTO polls (discord_guild_id, discord_channel_id, discord_message_id, discord_role_id, description, until, revealed, allowed_emojis, minimum_votes_required, link)
+      VALUES (@guildId, @channelId, @messageId, @roleId, @description, @until, false, @allowedEmojis, @minimumVotesRequired, @link)
     `)    
     const info = stmt.run({
-      guildId, channelId, messageId, roleId, description, until: format(until, "yyyy-MM-dd'T'HH:mm:ss'Z'"), allowedEmojis
+      guildId, channelId, messageId, roleId, description, until: format(until, "yyyy-MM-dd'T'HH:mm:ss'Z'"), allowedEmojis, minimumVotesRequired, link
     })
     return info.lastInsertRowid
   }
@@ -494,6 +500,23 @@ export class DAOService extends BaseService {
     } catch (err) {
       // ignored, dm disabled by user
     }    
+
+    // update poll message if a minimum number of votes is required
+    const voteCount = this.getPollResults(messageId).reduce((a, b) => a + b.count, 0)
+    const channel = await this.discordClient.getClient().channels.cache.get(poll.discord_channel_id) as TextChannel;
+    if (!channel) {
+      logger.warn(`cannot find channel for ended vote: ${poll.discord_channel_id}`)
+      return
+    }
+    
+    const until = parseISO(poll.until)
+    const untilUTC = utcToZonedTime(until, 'Etc/UTC');
+
+    const embed = this.formatVoteMessage(poll.description, untilUTC, poll.link, poll.discord_role_id, poll.minimum_votes_required, voteCount)
+    const message = await channel.messages.fetch(poll.discord_message_id)
+    await message.edit({
+      embeds: [embed]
+    })
   }
 
   async registerCommands() {
@@ -522,7 +545,13 @@ export class DAOService extends BaseService {
       .addStringOption(option => option.setName('emojis')
         .setDescription('The allowed emojis')
         .setRequired(false))
-
+      .addStringOption(option => option.setName('link')
+        .setDescription('An optional link')
+        .setRequired(false))        
+      .addStringOption(option => option.setName('minimumvotes')
+        .setDescription('Requires a minimum number of votes')
+        .setRequired(false))                
+        
       const pollResults = new SlashCommandBuilder()
         .setName('pollresults')
         .setDescription('Get poll results')
@@ -634,14 +663,21 @@ export class DAOService extends BaseService {
           const description = interaction.options.get('description')?.value?.toString()
           const duration = interaction.options.get('duration')?.value as number
           const roleRequired = interaction.options.get('role')?.value as string
+          const link = interaction.options.get('link')?.value as string
+          const minimumVotesRequired = interaction.options.get('minimumvotes')?.value as number
           const until = new Date()
           until.setTime(new Date().getTime() + duration*60*60*1000)
-          //
-          let msg = `\n———\n🗳️ • An admin just posted a new vote:\n\n> ${description}\n\nReact below to vote until the ${until.toLocaleDateString()} ${until.toLocaleTimeString()} UTC  — <t:${Math.round(new Date(until).getTime()/1000)}:R>`
-          if (roleRequired) {
-            msg += `\nRole required: <@&${roleRequired}>\n———\n`
+
+          const embed = this.formatVoteMessage(description, until, link, roleRequired, minimumVotesRequired)
+
+          if (embed.description.length >= 4000) {
+            await interaction.editReply(`Your message is too long, please reduce it.`)
+            return
           }
-          const message = await channel.send(msg)
+                      
+          const message = await channel.send({
+            embeds: [embed]
+          })
 
           const allowedEmojis = interaction.options.get('emojis')?.value as string ?? '👍 👎'
           const emojis = Array.from(allowedEmojis)
@@ -651,7 +687,7 @@ export class DAOService extends BaseService {
           }
           this.bindReactionCollector(message)
 
-          const voteId = this.createPoll(interaction.guildId, interaction.channelId, message.id, roleRequired, description, until, allowedEmojis)
+          const voteId = this.createPoll(interaction.guildId, interaction.channelId, message.id, roleRequired, description, until, allowedEmojis, minimumVotesRequired, link)
           interaction.editReply(`**Vote ID #${voteId}**`)
         } else if ('bounded' === interaction.commandName) {
           await interaction.deferReply({ephemeral: true})
@@ -683,6 +719,32 @@ export class DAOService extends BaseService {
       }
     }
     this.getDiscordInteractionsListeners().push(listener)
+  }
+
+  formatVoteMessage(description:string, until:Date, link:string, roleRequired:string, minimumVotesRequired:number, voteCount:number=0) {
+    //
+    let msg = `${description}\n\nReact below to vote until the ${until.toLocaleDateString()} ${until.toLocaleTimeString()} UTC  — <t:${Math.round(new Date(until).getTime()/1000)}:R>`
+    if (roleRequired) {
+      msg += `\nRole required: <@&${roleRequired}>\n`
+    }
+    if (minimumVotesRequired) {
+      const reached = voteCount >= minimumVotesRequired ? '✅' : '❌'
+      msg += `\nMinimum votes required: ${minimumVotesRequired} (reached: ${reached})\n`
+    }
+    if (minimumVotesRequired || roleRequired) {
+      msg += `\n———`
+    }
+
+    const titleText = '🗳️ • An admin just posted a new vote'
+    const title = `${titleText} ${link ?? ''}` 
+
+    const embed = new MessageEmbed()
+      .setColor('#CCCCCC' as HexColorString)
+      .setTitle(title)
+      .setDescription(msg)
+      .setTimestamp();   
+    
+    return embed
   }
   
   bindReactionCollector(message: Message) {

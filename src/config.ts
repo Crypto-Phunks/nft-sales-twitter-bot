@@ -26,7 +26,7 @@ export const config = {
   discord_guild_ids: '880485569652740136,968448656221011978',
   dao_requires_encryption_key: false,
   dao_roles: [
-    
+    /*
     {
       guildId: '880485569652740136',
       roleId: '1157766800629563452',
@@ -35,6 +35,15 @@ export const config = {
       minOwnedTime: 30, // in days
       disallowAll: false,
     },
+    */
+
+    {
+      guildId: '880485569652740136',
+      roleId: '1170695892723056650',
+      specificTrait: {
+        count: 6
+      }
+    },   
 /*
     {
       guildId: '880485569652740136',

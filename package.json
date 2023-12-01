@@ -38,6 +38,7 @@
     "cpx": "^1.5.0",
     "currency.js": "^2.0.4",
     "date-fns": "^2.30.0",
+    "date-fns-tz": "^2.0.0",
     "date-utils": "^1.2.21",
     "discord-api-types": "^0.37.53",
     "discord.js": "^13",
