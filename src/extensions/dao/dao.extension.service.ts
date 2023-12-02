@@ -621,11 +621,16 @@ export class DAOService extends BaseService {
           const polls = this.getActivePolls()
           let response = `**Active polls:**\n———\n`
           polls.forEach(poll => {
-            response += `\n**Description:**\n\n> ${poll.description}\n\n`
-            response += `Active until: ${poll.until} UTC — <t:${Math.round(new Date(poll.until).getTime()/1000)}:R>\n`
-            response += `Poll ID: ${poll.discord_message_id}\n`
-            response += `🗳️ • [**Vote Here!**](<https://discord.com/channels/${poll.discord_guild_id}/${poll.discord_channel_id}/${poll.discord_message_id}>)\n\n`
-            response += `———\n`
+            let buffer = ''
+            buffer += `\n**Description:**\n\n> ${poll.description.substring(0, 20)}...\n\n`
+            buffer += `Active until: ${poll.until} UTC — <t:${Math.round(new Date(poll.until).getTime()/1000)}:R>\n`
+            buffer += `Poll ID: ${poll.discord_message_id}\n`
+            buffer += `🗳️ • [**Vote Here!**](<https://discord.com/channels/${poll.discord_guild_id}/${poll.discord_channel_id}/${poll.discord_message_id}>)\n\n`
+            buffer += `———\n`
+
+            if (response.length + buffer.length < 2000) {
+              response += buffer
+            }
           });
           interaction.editReply(response)
         } else if ('closepoll' === interaction.commandName) {
