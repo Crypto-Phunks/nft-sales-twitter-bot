@@ -641,14 +641,14 @@ export class DAOService extends BaseService {
           });
           interaction.editReply(response)
         } else if ('closepoll' === interaction.commandName) {
-          await interaction.deferReply({ephemeral: true})
+          await interaction.deferReply()
           const messageId = interaction.options.get('id')?.value as string
           this.closePoll(messageId)
           const response = `Poll closed.`
           this.handleEndedPolls()
           interaction.editReply(response)
         } else if ('deletepoll' === interaction.commandName) {
-          await interaction.deferReply({ephemeral: true})
+          await interaction.deferReply()
           const messageId = interaction.options.get('id')?.value as string
           this.deletePoll(messageId)
           const response = `Poll deleted.`
