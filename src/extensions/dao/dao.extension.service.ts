@@ -370,6 +370,10 @@ export class DAOService extends BaseService {
 
   async deletePoll(messageId:string) {
     const poll = this.getPoll(messageId)
+    if (poll === undefined) {
+      logger.warn(`cannot find poll for message id ${messageId}`)
+      return
+    }
     this.db.prepare(`DELETE FROM polls
       WHERE discord_message_id = @messageId`)
       .run({messageId: messageId})
@@ -403,7 +407,10 @@ export class DAOService extends BaseService {
         continue
       }
       const voteMessage = await channel.messages.fetch(row.discord_message_id)
-      await voteMessage.edit(message)
+      await voteMessage.edit({
+        embeds: [],
+        content: message
+      })
       await voteMessage.reactions.removeAll()
       this.db.prepare(`UPDATE polls SET revealed = TRUE WHERE discord_message_id = @messageId`).run({messageId: row.discord_message_id})
     }
