@@ -392,7 +392,7 @@ export class DAOService extends BaseService {
     for (const row of all) {
       //console.log(row)
       const votes = this.getPollResults(row.discord_message_id)
-      let message = `\n———\n⏰ • Vote ended, description: \n\n> ${row.description}\n\nResults @everyone:\n———\n`
+      let message = `${row.description}\n\nResults @everyone:\n———\n`
       votes.forEach(vote => {
         message += `${vote.vote_value}\t${vote.count}\n———\n`
       });
@@ -406,10 +406,18 @@ export class DAOService extends BaseService {
         logger.warn(`cannot find channel for ended vote: ${row.discord_channel_id}`)
         continue
       }
+      const titleText = `⏰ • Vote ended`
+      const title = `${titleText} ${row.link ?? ''}` 
+
+      const embed = new MessageEmbed()
+        .setColor('#CCCCCC' as HexColorString)
+        .setTitle(title)
+        .setDescription(message)
+        .setTimestamp();   
+              
       const voteMessage = await channel.messages.fetch(row.discord_message_id)
       await voteMessage.edit({
-        embeds: [],
-        content: message
+        embeds: [embed]
       })
       await voteMessage.reactions.removeAll()
       this.db.prepare(`UPDATE polls SET revealed = TRUE WHERE discord_message_id = @messageId`).run({messageId: row.discord_message_id})
