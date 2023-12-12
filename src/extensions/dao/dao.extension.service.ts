@@ -682,7 +682,7 @@ export class DAOService extends BaseService {
                 interaction.editReply(response)
                 needAdditionalMessage = true                
               } else {
-                interaction.followUp(response)
+                interaction.followUp({ephemeral: true, content: response})
               }
               response = ''
             }
