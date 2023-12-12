@@ -673,26 +673,16 @@ export class DAOService extends BaseService {
           });
           response += `\nDetailed votes: \n\n`
           const voteDetails = this.getDetailedPollResults(messageId)
-          let needAdditionalMessage = false
           voteDetails.forEach(vote => {
             response += `${vote.vote_value} <@${vote.discord_user_id}> (${vote.voted_at}) \n`
             if (response.length > 1500) {
               response += `\n——— continued in next message ———\n`
-              if (!needAdditionalMessage) {
-                interaction.editReply(response)
-                needAdditionalMessage = true                
-              } else {
-                interaction.followUp({ephemeral: true, content: response})
-              }
+              interaction.followUp({ephemeral: true, content: response})
               response = ''
             }
           });
           
-          if (!needAdditionalMessage) {
-            interaction.editReply(response)
-          } else {
-            interaction.followUp(response)
-          }
+          interaction.followUp({ephemeral: true, content: response})
 
         } else if ('createpoll' === interaction.commandName) {
           await interaction.deferReply()
