@@ -666,16 +666,34 @@ export class DAOService extends BaseService {
           await interaction.deferReply({ephemeral: true})
           const messageId = interaction.options.get('id')?.value as string
           const votes = this.getPollResults(messageId)
+
           let response = `Current results:\n———\n`
           votes.forEach(vote => {
             response += `${vote.vote_value}\t${vote.count}\n———\n`
           });
-          response += `Detailed votes: \n\n`
+          response += `\nDetailed votes: \n\n`
           const voteDetails = this.getDetailedPollResults(messageId)
+          let needAdditionalMessage = false
           voteDetails.forEach(vote => {
             response += `${vote.vote_value} <@${vote.discord_user_id}> (${vote.voted_at}) \n`
+            if (response.length > 1500) {
+              response += `\n——— continued in next message ———\n`
+              if (!needAdditionalMessage) {
+                interaction.editReply(response)
+                needAdditionalMessage = true                
+              } else {
+                interaction.channel?.send(response)
+              }
+              response = ''
+            }
           });
-          interaction.editReply(response)
+          
+          if (!needAdditionalMessage) {
+            interaction.editReply(response)
+          } else {
+            interaction.channel?.send(response)
+          }
+
         } else if ('createpoll' === interaction.commandName) {
           await interaction.deferReply()
           const channel = await this.discordClient.getClient().channels.fetch(interaction.channelId) as TextChannel;
