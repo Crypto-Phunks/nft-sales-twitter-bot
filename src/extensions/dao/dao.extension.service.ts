@@ -682,7 +682,7 @@ export class DAOService extends BaseService {
                 interaction.editReply(response)
                 needAdditionalMessage = true                
               } else {
-                interaction.channel?.send(response)
+                interaction.followUp(response)
               }
               response = ''
             }
@@ -691,7 +691,7 @@ export class DAOService extends BaseService {
           if (!needAdditionalMessage) {
             interaction.editReply(response)
           } else {
-            interaction.channel?.send(response)
+            interaction.followUp(response)
           }
 
         } else if ('createpoll' === interaction.commandName) {
