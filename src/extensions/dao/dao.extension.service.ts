@@ -146,7 +146,7 @@ export class DAOService extends BaseService {
   async grantRoles() {
     try {
       if (providers.indexOf(StatisticsService) >= 0) {
-        logger.info(`grantRoles()`)
+        // logger.info(`grantRoles()`)
         const statisticsService = this.moduleRef.get(StatisticsService);
 
         for (let conf of config.dao_roles) {
@@ -339,7 +339,7 @@ export class DAOService extends BaseService {
       member.roles.remove(role)
       this.removeGracePeriod(row.discord_guild_id, row.discord_user_id, row.discord_role_id)
     }
-    logger.info('cleaned grace periods')
+    // logger.info('cleaned grace periods')
   }
   
   getActivePolls() {
