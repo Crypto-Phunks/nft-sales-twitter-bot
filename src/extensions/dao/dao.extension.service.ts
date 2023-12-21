@@ -228,10 +228,10 @@ export class DAOService extends BaseService {
               }
             }
           }
-
-          await this.handleGracePeriods()
-          setTimeout(() => this.grantRoles(), 60000*5)
         }
+
+        await this.handleGracePeriods()
+        setTimeout(() => this.grantRoles(), 60000*5)        
       }
       /*
       guilds.roles.cache.find(role => role.name === "role name");
