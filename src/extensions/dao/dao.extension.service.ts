@@ -126,7 +126,8 @@ export class DAOService extends BaseService {
         discord_message_id text NOT NULL,
         discord_user_id text NOT NULL,
         vote_value text NOT NULL,
-        voted_at text NOT NULL
+        voted_at text NOT NULL,
+        vote_origin text
       );`,
     ).run();
     this.db.prepare(
@@ -351,6 +352,12 @@ export class DAOService extends BaseService {
       SELECT * FROM polls ORDER BY until DESC
     `).all()
   }
+
+  getAllLinkedPolls(id:number) {
+    return this.db.prepare(`
+      SELECT * FROM polls WHERE linked_poll_id = @id ORDER BY until DESC
+    `).all({id})
+  }  
   
   getPoll(messageId:string) {
     return this.db.prepare(`
@@ -367,12 +374,18 @@ export class DAOService extends BaseService {
   }
 
   async closePoll(messageId:string) {
+    const poll = this.getPoll(messageId)
     this.db.prepare(`UPDATE polls SET until = DATETIME('now', '-5 minutes')
       WHERE discord_message_id = @messageId`)
       .run({messageId: messageId})
+
+    const linkedPolls = this.getAllLinkedPolls(poll.id)
+    for (const linkedPoll of linkedPolls) {
+      this.deletePoll(linkedPoll.discord_message_id)
+    }      
   }
 
-  async deletePoll(messageId:string) {
+  async deletePoll(messageId:string, linked:boolean = false) {
     const poll = this.getPoll(messageId)
     if (poll === undefined) {
       logger.warn(`cannot find poll for message id ${messageId}`)
@@ -383,8 +396,14 @@ export class DAOService extends BaseService {
       .run({messageId: messageId})
     const channel = await this.discordClient.getClient().channels.cache.get(poll.discord_channel_id) as TextChannel;      
     const voteMessage = await channel.messages.fetch(messageId)
-    await voteMessage.edit(`Vote deleted.`)
+    const message = linked ? `Root poll has been deleted.` : `Poll deleted.`
+    await voteMessage.edit(message)
     await voteMessage.reactions.removeAll()
+
+    const linkedPolls = this.getAllLinkedPolls(poll.id)
+    for (const linkedPoll of linkedPolls) {
+      this.deletePoll(linkedPoll.discord_message_id, true)
+    }
   }
 
   async handleEndedPolls() {
@@ -490,7 +509,7 @@ export class DAOService extends BaseService {
     let poll = this.db.prepare(`SELECT * FROM polls WHERE discord_message_id = @messageId`).get({messageId})
     let initialPoll = poll
     if (poll.linked_poll_id !== null) {
-      poll = this.db.prepare(`SELECT * FROM polls WHERE id = @id`).get({id: poll.linked_poll_id})
+      initialPoll = this.db.prepare(`SELECT * FROM polls WHERE id = @id`).get({id: poll.linked_poll_id})
     }
     if (poll.allowed_emojis.indexOf(value) === -1) {
       console.log('not an allowed emoji')
@@ -513,18 +532,20 @@ export class DAOService extends BaseService {
       discord_message_id = @messageId AND
       discord_user_id = @userId
     `).run({
-      guildId, messageId, userId
+      guildId: initialPoll.discord_guild_id, messageId: initialPoll.discord_message_id, userId
     })
     const stmt = this.db.prepare(`
-      INSERT INTO poll_votes (discord_guild_id, discord_message_id, discord_user_id, vote_value, voted_at)
-      VALUES (@guildId, @messageId, @userId, @value, datetime())
+      INSERT INTO poll_votes (discord_guild_id, discord_message_id, discord_user_id, vote_value, voted_at, vote_origin)
+      VALUES (@guildId, @messageId, @userId, @value, datetime(), @voteOrigin)
     `)    
+    const voteOrigin = `https://discord.com/channels/${poll.discord_guild_id}/${poll.discord_channel_id}/${poll.discord_message_id}`
     stmt.run({
-      guildId, messageId, userId, value
+      guildId:initialPoll.discord_guild_id, 
+      messageId: initialPoll.discord_message_id, userId, value, voteOrigin
     })
     try {
       const dm = await member.createDM(true)
-      await dm.send(`Your vote on https://discord.com/channels/${initialPoll.discord_guild_id}/${initialPoll.discord_channel_id}/${initialPoll.discord_message_id} has been recorded.`)
+      await dm.send(`Your vote on https://discord.com/channels/${poll.discord_guild_id}/${poll.discord_channel_id}/${poll.discord_message_id} has been recorded.`)
     } catch (err) {
       // ignored, dm disabled by user
     }    
@@ -738,7 +759,7 @@ export class DAOService extends BaseService {
           response += `\nDetailed votes: \n\n`
           const voteDetails = this.getDetailedPollResults(messageId)
           voteDetails.forEach(vote => {
-            response += `${vote.vote_value} <@${vote.discord_user_id}> (${vote.voted_at}) \n`
+            response += `${vote.vote_value} <@${vote.discord_user_id}> (${vote.voted_at}) on ${vote.vote_origin} \n`
             if (response.length > 1500) {
               response += `\n——— continued in next message ———\n`
               interaction.followUp({ephemeral: true, content: response})
