@@ -115,7 +115,8 @@ export class DAOService extends BaseService {
         revealed boolean NOT NULL,
         allowed_emojis text NOT NULL,
         minimum_votes_required number,
-        link text
+        link text,
+        linked_poll_id INTEGER
       );`,
     ).run();
     this.db.prepare(
@@ -137,10 +138,6 @@ export class DAOService extends BaseService {
         until text NOT NULL
       );`,
     ).run();
-  }
-
-  async bounded(username:string) {
-
   }
 
   async grantRoles() {
@@ -361,6 +358,13 @@ export class DAOService extends BaseService {
       WHERE discord_message_id = :messageId
     `).get({messageId})
   }
+  
+  getPollById(id:string) {
+    return this.db.prepare(`
+      SELECT * FROM polls
+      WHERE id = :id
+    `).get({id})
+  }
 
   async closePoll(messageId:string) {
     this.db.prepare(`UPDATE polls SET until = DATETIME('now', '-5 minutes')
@@ -389,25 +393,30 @@ export class DAOService extends BaseService {
       WHERE datetime(until) < datetime() AND revealed = FALSE
     `)  
     const all = stmt.all()
-    for (const row of all) {
+    for (let poll of all) {
+      let initialPoll = poll
+      if (poll.linked_poll_id !== null) {
+        initialPoll = this.db.prepare(`SELECT * FROM polls WHERE id = @id`).get({id: poll.linked_poll_id})
+      }
+  
       //console.log(row)
-      const votes = this.getPollResults(row.discord_message_id)
-      let message = `${row.description}\n\nResults @everyone:\n———\n`
+      const votes = this.getPollResults(initialPoll.discord_message_id)
+      let message = `${poll.description}\n\nResults @everyone:\n———\n`
       votes.forEach(vote => {
         message += `${vote.vote_value}\t${vote.count}\n———\n`
       });
-      message += `Poll ID: ${row.discord_message_id}\n`
-      if (row.minimum_votes_required > 0) {
-        message += `Minimum votes required was: ${row.minimum_votes_required}\n`
+      message += `Poll ID: ${poll.discord_message_id}\n`
+      if (poll.minimum_votes_required > 0) {
+        message += `Minimum votes required was: ${poll.minimum_votes_required}\n`
       }
       
-      const channel = await this.discordClient.getClient().channels.cache.get(row.discord_channel_id) as TextChannel;
+      const channel = await this.discordClient.getClient().channels.cache.get(poll.discord_channel_id) as TextChannel;
       if (!channel) {
-        logger.warn(`cannot find channel for ended vote: ${row.discord_channel_id}`)
+        logger.warn(`cannot find channel for ended vote: ${poll.discord_channel_id}`)
         continue
       }
       const titleText = `⏰ • Vote ended`
-      const title = `${titleText} ${row.link ?? ''}` 
+      const title = `${titleText} ${poll.link ?? ''}` 
 
       const embed = new MessageEmbed()
         .setColor('#CCCCCC' as HexColorString)
@@ -415,12 +424,12 @@ export class DAOService extends BaseService {
         .setDescription(message)
         .setTimestamp();   
               
-      const voteMessage = await channel.messages.fetch(row.discord_message_id)
+      const voteMessage = await channel.messages.fetch(poll.discord_message_id)
       await voteMessage.edit({
         embeds: [embed]
       })
       await voteMessage.reactions.removeAll()
-      this.db.prepare(`UPDATE polls SET revealed = TRUE WHERE discord_message_id = @messageId`).run({messageId: row.discord_message_id})
+      this.db.prepare(`UPDATE polls SET revealed = TRUE WHERE discord_message_id = @messageId`).run({messageId: poll.discord_message_id})
     }
     logger.info('cleaned end polls')
     setTimeout(() => this.handleEndedPolls(), 60000*10)
@@ -466,19 +475,23 @@ export class DAOService extends BaseService {
     })
   }
 
-  createPoll(guildId:string, channelId:string, messageId:string, roleId:string, description:string, until:Date, allowedEmojis:string, minimumVotesRequired:number, link:string) {
+  createPoll(guildId:string, channelId:string, messageId:string, roleId:string, description:string, until:Date, allowedEmojis:string, minimumVotesRequired:number, link:string, linkedPollId:number=undefined) {
     const stmt = this.db.prepare(`
-      INSERT INTO polls (discord_guild_id, discord_channel_id, discord_message_id, discord_role_id, description, until, revealed, allowed_emojis, minimum_votes_required, link)
-      VALUES (@guildId, @channelId, @messageId, @roleId, @description, @until, false, @allowedEmojis, @minimumVotesRequired, @link)
+      INSERT INTO polls (discord_guild_id, discord_channel_id, discord_message_id, discord_role_id, description, until, revealed, allowed_emojis, minimum_votes_required, link, linked_poll_id)
+      VALUES (@guildId, @channelId, @messageId, @roleId, @description, @until, false, @allowedEmojis, @minimumVotesRequired, @link, @linkedPollId)
     `)    
     const info = stmt.run({
-      guildId, channelId, messageId, roleId, description, until: format(until, "yyyy-MM-dd'T'HH:mm:ss'Z'"), allowedEmojis, minimumVotesRequired, link
+      guildId, channelId, messageId, roleId, description, until: format(until, "yyyy-MM-dd'T'HH:mm:ss'Z'"), allowedEmojis, minimumVotesRequired, link, linkedPollId
     })
     return info.lastInsertRowid
   }
 
   async createPollVote(guildId:string, messageId:string, userId:string, value:string) {
-    const poll = this.db.prepare(`SELECT * FROM polls WHERE discord_message_id = @messageId`).get({messageId})
+    let poll = this.db.prepare(`SELECT * FROM polls WHERE discord_message_id = @messageId`).get({messageId})
+    let initialPoll = poll
+    if (poll.linked_poll_id !== null) {
+      poll = this.db.prepare(`SELECT * FROM polls WHERE id = @id`).get({id: poll.linked_poll_id})
+    }
     if (poll.allowed_emojis.indexOf(value) === -1) {
       console.log('not an allowed emoji')
       return
@@ -511,7 +524,7 @@ export class DAOService extends BaseService {
     })
     try {
       const dm = await member.createDM(true)
-      await dm.send(`Your vote on https://discord.com/channels/${poll.discord_guild_id}/${poll.discord_channel_id}/${poll.discord_message_id} has been recorded.`)
+      await dm.send(`Your vote on https://discord.com/channels/${initialPoll.discord_guild_id}/${initialPoll.discord_channel_id}/${initialPoll.discord_message_id} has been recorded.`)
     } catch (err) {
       // ignored, dm disabled by user
     }    
@@ -562,11 +575,25 @@ export class DAOService extends BaseService {
         .setRequired(false))
       .addStringOption(option => option.setName('link')
         .setDescription('An optional link')
-        .setRequired(false))        
+        .setRequired(false))    
       .addStringOption(option => option.setName('minimumvotes')
         .setDescription('Requires a minimum number of votes')
         .setRequired(false))                
-        
+
+      const repostPoll = new SlashCommandBuilder()
+        .setName('repostpoll')
+        .setDescription('Repost an existing poll into another discord server')
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+        .addIntegerOption(option => option.setName('pollid')
+          .setDescription('The initial poll ID')
+          .setRequired(true))        
+        .addRoleOption(option => option.setName('role')
+          .setDescription('The role required to cast a vote')
+          .setRequired(false))
+        .addStringOption(option => option.setName('link')
+          .setDescription('An optional link')
+          .setRequired(false))    
+
       const pollResults = new SlashCommandBuilder()
         .setName('pollresults')
         .setDescription('Get poll results')
@@ -601,6 +628,7 @@ export class DAOService extends BaseService {
 
     const commands = [
       bindTwitter.toJSON(),
+      repostPoll.toJSON(),
       bindWeb3.toJSON(),
       bounded.toJSON(),
       createPoll.toJSON(),
@@ -631,6 +659,42 @@ export class DAOService extends BaseService {
             interaction.editReply(`Please ask the admin to setup the encryption key first`)
           }          
           interaction.editReply(`[**Click here to bind your twitter account.**](${result.url})`)
+        } else if ('repostpoll' === interaction.commandName) {
+          await interaction.deferReply()
+          const voteId = interaction.options.get('pollid')?.value as number
+          const roleRequired = interaction.options.get('role')?.value as string
+          const link = interaction.options.get('link')?.value as string
+          const poll = this.getPollById(voteId.toString())
+          if (!poll) {
+            interaction.editReply(`Cannot find poll with ID ${voteId}`)
+            return
+          }
+          const channel = await this.discordClient.getClient().channels.fetch(interaction.channelId) as TextChannel;
+          const description = poll.description
+          const minimumVotesRequired = poll.minimum_votes_required
+          const until = parseISO(poll.until)
+          const untilUTC = utcToZonedTime(until, 'Etc/UTC');
+          const embed = this.formatVoteMessage(description, untilUTC, link, roleRequired, minimumVotesRequired)
+
+          if (embed.description.length >= 4000) {
+            await interaction.editReply(`Your message is too long, please reduce it.`)
+            return
+          }
+                      
+          const message = await channel.send({
+            embeds: [embed]
+          })
+
+          const allowedEmojis = poll.allowed_emojis as string
+          const emojis = Array.from(allowedEmojis)
+
+          for (let i=0; i < emojis.length; i+=2) { 
+            await message.react(emojis[i])
+          }
+          this.bindReactionCollector(message)
+
+          this.createPoll(interaction.guildId, interaction.channelId, message.id, roleRequired, description, until, allowedEmojis, minimumVotesRequired, link, voteId)
+          interaction.editReply(`**Vote ID #${poll.id} (cross-posted)**`)
         } else if ('listpolls' === interaction.commandName) {
           await interaction.deferReply({ephemeral: true})
           const polls = this.getActivePolls()
