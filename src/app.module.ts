@@ -14,6 +14,7 @@ import { DAOService } from './extensions/dao/dao.extension.service';
 import { DAOController } from './extensions/dao/dao.controller';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
+import { BasicMessagingService } from './extensions/dao/basic.messaging.extension.service';
 
 export const providers = [
   Erc721SalesService,
@@ -41,6 +42,7 @@ export const providers = [
       Erc721SalesService,
       DAOService,
       StatisticsService,
+      BasicMessagingService,
       ////
       // Below is a simple example of how to create and plug a custom 
       // extension to the bot
