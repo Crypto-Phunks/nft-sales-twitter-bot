@@ -37,20 +37,7 @@ export const providers = [
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'client'),
     })],
-    providers: [
-      Erc721SalesService,
-      StatisticsService,
-      ////
-      // Below is a simple example of how to create and plug a custom 
-      // extension to the bot
-      ////
-      //
-      // PhunksBidService,
-      // PhunksAuctionHouseService,
-      // PhunksAuctionFlywheelService, 
-      // StatisticsService,
-      // DAOService,
-    ],
+    providers,
     controllers: [
       DAOController
     ],
