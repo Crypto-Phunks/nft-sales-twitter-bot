@@ -22,6 +22,7 @@ import { unique } from 'src/utils/array.utils';
 import { decrypt, encrypt } from './crypto';
 import { de } from 'date-fns/locale';
 import { utcToZonedTime } from 'date-fns-tz';
+import { log } from 'winston';
 
 const logger = createLogger('dao.extension.service')
 
@@ -59,9 +60,10 @@ export class BasicMessagingService extends BaseService {
       try {
         if (!interaction.isCommand()) return;
         if ('say' === interaction.commandName) {
+          const message = interaction.options.getString('message')
+          logger.info(`say command received from ${interaction.user.username}}: ${message}`)
           await interaction.deferReply({ephemeral: true})  
           interaction.editReply(`Sent!`)
-          const message = interaction.options.getString('message')
           const channel = interaction.channel as TextChannel
           await channel.send(message)
         }
