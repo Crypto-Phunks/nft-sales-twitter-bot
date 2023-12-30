@@ -43,7 +43,8 @@ export class DAOService extends BaseService {
   ) {
     super(http)
     logger.info('created DAOService')
-    
+    process.env.TZ = 'Etc/UTC';
+
     this.discordClient.init(() => {
       this.registerCommands()
       this.start()
