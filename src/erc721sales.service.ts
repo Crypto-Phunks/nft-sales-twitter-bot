@@ -93,6 +93,7 @@ export class Erc721SalesService extends BaseService {
       } catch (err) {
         console.log(err)
         retryCount++
+        await new Promise( resolve => setTimeout(resolve, 500*retryCount) )
         if (retryCount > 5) {
           console.log(`stop retrying, failing on ${latestTweetedTx}, moving to next block`)
           this.currentBlock = latestTweetedBlock + 1 
