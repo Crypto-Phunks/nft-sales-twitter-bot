@@ -46,6 +46,7 @@ export class BasicMessagingService extends BaseService {
       .setName('say')
       .setDescription('Ask the bot to post something in the current channel')
       .addStringOption(option => option.setName('message')
+        .setDescription('The message to send')
         .setRequired(true))
     
     const commands = [
