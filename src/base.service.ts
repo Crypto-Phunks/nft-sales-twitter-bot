@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
+import fetch from 'node-fetch';
+import { promises as asyncfs } from 'fs';
 import { HttpService } from '@nestjs/axios';
 import fs from 'fs';
 import fiatSymbols from './fiat-symobols.json';
 import { ethers } from 'ethers';
-import { catchError, firstValueFrom, map, Observable, of, switchMap, timer } from 'rxjs';
+import { catchError, defaultIfEmpty, EMPTY, firstValueFrom, map, Observable, of, switchMap, tap, timer } from 'rxjs';
 import currency from 'currency.js';
 
 import dotenv from 'dotenv';
@@ -15,18 +17,44 @@ import { EUploadMimeType } from 'twitter-api-v2';
 import DiscordClient from './clients/discord';
 import { createLogger } from './logging.utils';
 import { HexColorString, MessageAttachment, MessageEmbed } from 'discord.js';
+import { REST } from '@discordjs/rest';
+import { Routes } from 'discord-api-types/v10';
+import { formatDistance } from 'date-fns';
 
 export const alchemyAPIUrl = 'https://eth-mainnet.alchemyapi.io/v2/';
 export const alchemyAPIKey = process.env.ALCHEMY_API_KEY;
+
 //const provider = ethers.getDefaultProvider(alchemyAPIUrl + alchemyAPIKey);
 const provider = global.providerForceHTTPS ? 
   ethers.getDefaultProvider(process.env.GETH_NODE_ENDPOINT_HTTP) :
   ethers.getDefaultProvider(process.env.GETH_NODE_ENDPOINT);
 
-const logger = createLogger('base.service')
 
-if (!global.noWatchdog) {
+const pendingTransactions = []
+const MAX_PENDING_TRANSACTIONS = 20000
+
+const logger = createLogger('base.service')
+let pendingTransactionWatcherStarted = false
+
+let fiatValues = {}
+getCryptoToFiat()
+
+async function getCryptoToFiat() {
+  logger.info('refreshing fiat values')
+  const endpoint = `https://api.coingecko.com/api/v3/simple/price?ids=ethereum,dai,usdc&vs_currencies=usd`;
+  const res = await fetch(endpoint)  
+  const data = await res.json() as any
+  fiatValues = { 'usdc': { 'usd': 1 }, ...data }
+  logger.info(`fiat values set to ${JSON.stringify(fiatValues)}`)
+
+  setTimeout(() => getCryptoToFiat(), 300000)
+}
+
+if (!global.noWatchdog && !global.doNotStartAutomatically) {
   startWatchdog()
+}
+if (config.enable_flashbot_detection && !global.doNotStartAutomatically) {
+  watchPendingTransactions()
 }
 
 function startWatchdog() {
@@ -34,13 +62,42 @@ function startWatchdog() {
     const timeoutInterval = setTimeout(() => {
       logger.warn(`Websocket connection hanged! Killing myself.`)
       process.exit(1)
-    }, 10000);
+    }, 20000);
     logger.info(`Checking websocket connection...`)
     const block = await provider.getBlockNumber()
     logger.info(`Websocket connection alive: ${block} !`)
     clearInterval(timeoutInterval)
     startWatchdog()
   }, 30000)  
+}
+
+function watchPendingTransactions() {
+  if (!pendingTransactionWatcherStarted) {
+    pendingTransactionWatcherStarted = true
+    
+    provider.on('pending', (txHash) => {
+      pendingTransactions.push({
+        time: new Date().getTime(),
+        hash: txHash
+      })
+    });
+
+    setInterval(() => {
+      if (pendingTransactions.length) {
+        if (pendingTransactions.length > MAX_PENDING_TRANSACTIONS) {
+          pendingTransactions.splice(0, pendingTransactions.length - MAX_PENDING_TRANSACTIONS)
+        }
+        const distanceFrom = formatDistance(pendingTransactions[0].time, new Date(), { addSuffix: true })
+        const distanceTo = formatDistance(pendingTransactions[pendingTransactions.length-1].time, new Date(), { addSuffix: true })
+        logger.info(`Analyzed ${pendingTransactions.length} pending transactions between ${distanceFrom} and ${distanceTo}...`)
+  
+        if (new Date().getTime() - pendingTransactions[pendingTransactions.length-1].time > 60000*5) {
+          logger.info(`Last pending transaction is older than 5 minutes, killing myself...`)
+          process.exit(1)
+        }
+      }
+    }, 5000)    
+  }
 }
 
 export interface TweetRequest {
@@ -52,38 +109,51 @@ export interface TweetRequest {
   from: any;
   to?: any;
   tokenId: string;
-  ether: number;
+  ether?: number;
+  erc20Token: string;
   transactionHash: string;
   transactionDate: string;
   alternateValue: number;
   imageUrl?: string;
   additionalText?: string;
-
 }
 
 @Injectable()
 export class BaseService {
   
-  fiatValues: any;
-
   twitterClient: TwitterClient;
   discordClient: DiscordClient;
 
   constructor(
     protected readonly http: HttpService
   ) {
-
-    this.getEthToFiat().subscribe((fiat) => {
-      if (fiat && fiat.ethereum && Object.values(fiat.ethereum).length)
-        this.fiatValues = fiat.ethereum
-    });
     this.twitterClient = new TwitterClient()
     this.discordClient = new DiscordClient()
+  }
 
+  isTransactionFlashbotted(hash:string) {
+    if (pendingTransactions.length < MAX_PENDING_TRANSACTIONS) {
+      logger.warn(`cannot determinate if the transaction used a flashbot because the pool is not full: ${pendingTransactions.length}`)
+      return false
+    }
+    for (let tx of pendingTransactions) {
+      if (tx.hash.toLowerCase() == hash.toLowerCase()) {
+        return false
+      }
+    }
+    return true
   }
 
   initDiscordClient() {
     this.discordClient.init()
+  }
+
+  getDiscordInteractionsListeners() {
+    return this.discordClient.getInteractionsListener()
+  }
+
+  getDiscordCommands() {
+    return this.discordClient.getDiscordCommands()
   }
 
   getWeb3Provider() {
@@ -96,18 +166,33 @@ export class BaseService {
     return address;
   }
 
-  async getTokenMetadata(tokenId: string): Promise<any> {
+  async getTokenMetadata(tokenId: string, onlyImage:boolean=true): Promise<any> {
+    // check cache 
+    const metadataPath = `${config.token_metadata_cache_path}/${tokenId}.json`
     const url = alchemyAPIUrl + alchemyAPIKey + '/getNFTMetadata';
-    return await firstValueFrom(
+    const hadCacheData = fs.existsSync(metadataPath)
+    let dataObserver = hadCacheData ? 
+      of({
+        data: JSON.parse(fs.readFileSync(metadataPath).toString())
+      }) :
       this.http.get(url, {
         params: {
           contractAddress: config.contract_address,
           tokenId,
           tokenType: 'erc721'
         }
-      }).pipe(
+      })
+
+    return await firstValueFrom(
+      dataObserver.pipe(
+        tap(async (res:any) => {
+          if (!hadCacheData && config.token_metadata_cache_path) {
+            logger.info(`populating metadata cache for ${tokenId}`)
+            await asyncfs.writeFile(metadataPath, JSON.stringify(res?.data))
+          }
+        }),
         map((res: any) => {
-          return res?.data?.metadata?.image_url || res?.data?.metadata?.image || res?.data?.tokenUri?.gateway;
+          return onlyImage ? res?.data?.metadata?.image_url || res?.data?.metadata?.image || res?.data?.tokenUri?.gateway : res?.data;
         }),
         catchError(() => {
           return of(null);
@@ -157,10 +242,14 @@ export class BaseService {
 
   async tweet(data: TweetRequest, template:string=config.saleMessage) {
 
-    const tweetText = this.formatText(data, template)
+    let tweetText = this.formatText(data, template)
+
+    // Delay tweets when running live
+    if (!global.doNotStartAutomatically)
+      await new Promise( resolve => setTimeout(resolve, 30000) );
     
     // Format our image to base64
-    const image = config.use_local_images ? data.imageUrl : this.transformImage(data.imageUrl);
+    const image = config.use_local_images || config.use_forced_remote_image_path ? data.imageUrl : this.transformImage(data.imageUrl);
 
     let processedImage: Buffer | undefined;
     if (image) processedImage = await this.getImageFile(image);
@@ -198,15 +287,14 @@ export class BaseService {
   }
 
   formatText(data: TweetRequest, template:string) {
+    if (!data) return template
 
     // Cash value
     const value = data.alternateValue && data.alternateValue > 0 ? data.alternateValue : data.ether
-    const fiatValue = this.fiatValues && Object.values(this.fiatValues).length ? this.fiatValues[config.currency] * value : undefined;
-    const fiat = fiatValue != null ? currency(fiatValue, { symbol: fiatSymbols[config.currency].symbol, precision: 0 }) : undefined;
-
-    const ethValue = data.alternateValue ? data.alternateValue : data.ether;
-    const eth = currency(ethValue, { symbol: 'Ξ', precision: 3 });
-
+    
+    const fiat = this.getFiatValue(value, data.erc20Token)
+    const eth = this.getERC20Value(data.alternateValue ? data.alternateValue : data.ether, data.erc20Token)
+    
     // Replace tokens from config file
     template = template.replace(new RegExp('<tokenId>', 'g'), data.tokenId);
     template = template.replace(new RegExp('<ethPrice>', 'g'), eth.format());
@@ -215,10 +303,46 @@ export class BaseService {
     template = template.replace(new RegExp('<initialFrom>', 'g'), data.initialFrom);
     template = template.replace(new RegExp('<to>', 'g'), data.to);
     template = template.replace(new RegExp('<initialTo>', 'g'), data.initialTo);
-    template = template.replace(new RegExp('<fiatPrice>', 'g'), fiat ? fiat.format() : '???');
+    template = template.replace(new RegExp('<fiatPrice>', 'g'), fiat ? fiat.format() : '-');
+    const platform = data.platform === 'blurio' ? 'Blur marketplace' : 
+      data.platform === 'opensea' ? 'OpenSea marketplace' : 
+      data.platform === 'looksrare' ? 'Looks Rare' : 
+      data.platform === 'arcadexyz' ? 'Arcade' : 
+      data.platform === 'nftfi' ? 'NFTfi' : 
+      data.platform === 'benddao' ? 'Bend DAO' : 
+      data.platform === 'metastreet' ? 'Metastreet' : 
+      data.platform === 'punksmarketplace' ? 'CryptoPunks marketplace' : 
+      data.platform
+    template = template.replace(new RegExp('<platform>', 'g'), platform);
     template = template.replace(new RegExp('<additionalText>', 'g'), data.additionalText);
 
+
+    if (config.enable_flashbot_detection && data.eventType !== 'loans')
+      template += ` — Flashbots Protect RPC: ${this.isTransactionFlashbotted(data.transactionHash) ? 'Yes' : 'No'}`
+
     return template
+  }
+
+  getERC20Value(value: number, erc20Token: string, forcedSymbol:string|undefined=undefined) {
+    const symbol = forcedSymbol !== undefined ? forcedSymbol 
+      : erc20Token === 'dai' ? 'DAI' 
+      : erc20Token === 'usdc' ? 'USDC' : 'Ξ'
+    const precision = erc20Token === 'dai' ? 0 : erc20Token === 'usdc' ? 2 : 3
+    const pattern = erc20Token === 'dai' ? '# !' : erc20Token === 'usdc' ? '# !' : '!#'
+    const eth = currency(value, { symbol, precision, pattern });
+    return eth
+  }
+
+  getFiatValue(value: number, erc20Token: string) {
+    try {
+      const fiatValue = fiatValues && Object.values(fiatValues).length ? 
+        fiatValues[erc20Token][config.currency] * value : 
+        undefined;
+      return fiatValue != null ? currency(fiatValue, { symbol: fiatSymbols[config.currency].symbol, precision: 0 }) : undefined
+    } catch (err) {
+      logger.error(`cannot get fiat for ${erc20Token}`)
+    }
+    return undefined
   }
   
   async getImageFile(url: string): Promise<Buffer | undefined> {
@@ -238,11 +362,11 @@ export class BaseService {
     });
   }
   
-  getEthToFiat(): Observable<any> {
+  getCryptoToFiat(): Observable<any> {
     const endpoint = `https://api.coingecko.com/api/v3/simple/price`;
     const params = {
-      ids: 'ethereum',
-      vs_currencies: 'usd,aud,gbp,eur,cad,jpy,cny'
+      ids: 'ethereum,dai,usdc',
+      vs_currencies: 'usd'
     };
     return timer(0, 300000).pipe(
       switchMap(() => this.http.get(endpoint, {params})),
@@ -266,6 +390,14 @@ export class BaseService {
       val = value.replace('ipfs://', 'https://cloudflare-ipfs.com/ipfs/');
     }
     return val ? val : null;
+  }
+
+  async updatePosition(position) {
+    await asyncfs.writeFile(this.getPositionFile(), `${position}`)    
+  }
+
+  getPositionFile():string {
+    throw new Error('must be overriden')
   }
 
 }

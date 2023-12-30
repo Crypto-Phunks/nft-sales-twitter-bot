@@ -1,3 +1,5 @@
+token_metadatas_cache/*.json
+*.txt
 bids_images
 db.db
 token_images
@@ -40,3 +42,8 @@ lerna-debug.log*
 !.vscode/launch.json
 !.vscode/extensions.json
 auction_images
+wrapped_punks
+wrapped_punks_old
+new
+original_punks_images
+punks_images

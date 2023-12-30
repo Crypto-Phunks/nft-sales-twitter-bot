@@ -2,7 +2,7 @@
   "collection": "@nestjs/schematics",
   "sourceRoot": "src",
   "compilerOptions": {
-    "assets": ["**/*.ttf", "**/*.svg", "**/*.json"]
+    "assets": ["**/*.ttf", "**/*.svg", "**/*.png", "**/*.json"]
   },
   "watchAssets": true
 }

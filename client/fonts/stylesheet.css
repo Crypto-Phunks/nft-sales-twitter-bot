@@ -1,0 +1,9 @@
+@font-face {
+    font-family: 'Retro Computer';
+    src: url('RetroComputer.woff2') format('woff2'),
+        url('RetroComputer.woff') format('woff');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+

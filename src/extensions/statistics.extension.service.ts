@@ -8,19 +8,24 @@ import { HttpService } from '@nestjs/axios';
 import { BaseService } from '../base.service';
 import { ethers } from 'ethers';
 import { config } from '../config';
-import { Erc721SalesService } from 'src/erc721sales.service';
+import { Erc721SalesService } from '../erc721sales.service';
 import Database from 'better-sqlite3'
 import rl from 'readline-sync'
 import { SlashCommandBuilder } from '@discordjs/builders';
 import { REST } from '@discordjs/rest'
 import { Routes } from 'discord-api-types/v9'
-import { createLogger } from 'src/logging.utils';
+import { createLogger } from '../logging.utils';
+import { unique } from '../utils/array.utils';
+import { providers } from 'src/app.module';
+import { DAOService } from './dao/dao.extension.service';
+import { ModuleRef } from '@nestjs/core';
+import { Interaction } from 'discord.js';
 
 const logger = createLogger('statistics.service')
 
 @Injectable()
 export class StatisticsService extends BaseService {
-  
+
   provider = this.getWeb3Provider();
   db = new Database(`${process.env.WORK_DIRECTORY || './'}db.db` /*, { verbose: logger.info } */);  
   insert: any;
@@ -31,23 +36,23 @@ export class StatisticsService extends BaseService {
   constructor(
     protected readonly http: HttpService,
     protected readonly erc721service: Erc721SalesService,
+    private readonly moduleRef: ModuleRef
   ) {
     super(http)
     logger.info('creating StatisticsService')
-    this.discordClient.init()
+    this.discordClient.init(() => {
+      this.registerCommands()
+    })
     
-    if (!global.doNotStartAutomatically)
+    if (!global.doNotStartAutomatically) {
       this.start()
-    this.registerCommands()
+    }
   }
 
   async registerCommands() {
     //https://discord.com/api/oauth2/authorize?client_id=1139547496033558561&permissions=2048&scope=bot%20applications.commands
 
-    // await delay(10000)
-
-    const rest = new REST().setToken(process.env.DISCORD_TOKEN);
-    
+    // await delay(10000)    
     const userStats = new SlashCommandBuilder()
       .setName('userstats')
       .setDescription('Get statistics about a wallet')
@@ -65,7 +70,7 @@ export class StatisticsService extends BaseService {
       .setDescription('Get owned tokens from a wallet')
       .addStringOption(option =>
         option.setName('wallet')
-          .setDescription('Wallet address or ENS name')
+          .setDescription('Wallet address, ENS name, or even mention if the DAO module is enabled')
           .setRequired(true));
 
     const checkTransaction = new SlashCommandBuilder()
@@ -152,7 +157,6 @@ export class StatisticsService extends BaseService {
           .setDescription('Restrict to the given wallet')
       )
 
-    const guildIds = config.discord_guild_ids.split(',')
     const commands = [
       status.toJSON(),
       userStats.toJSON(), 
@@ -165,14 +169,9 @@ export class StatisticsService extends BaseService {
     if (process.env.DEBUG_MODE === 'true') {
       commands.push(sample.toJSON())
     }
-    guildIds.forEach(async (guildId) => {
-      await rest.put(
-        Routes.applicationGuildCommands(config.discord_client_id, guildId),
-        { body: commands },
-      );    
-    })
+    this.getDiscordCommands().push(...commands)
 
-    this.discordClient.client.on('interactionCreate', async (interaction) => {
+    const interaction = async (interaction:Interaction) => {
       try {
         if (!interaction.isCommand()) return;
         if ('sample' === interaction.commandName) {
@@ -182,6 +181,7 @@ export class StatisticsService extends BaseService {
             initialFrom: '0x7e5ccBf79f81baF0430a9eD8208580c7157F143C',
             initialTo: '0xB39185e33E8c28e0BB3DbBCe24DA5dEA6379Ae91',
             from: '0x7e5...F143C',
+            erc20Token: 'ethereum',
             to: '0xB39...9Ae91',
             tokenId: '9608',
             ether: 0,
@@ -239,19 +239,34 @@ Amount:   ${'Ξ'+(Math.floor(r.amount*100)/100).toFixed(2)}`)
           const wallet = interaction.options.get('wallet')?.value?.toString()
           const window = interaction.options.get('window').value.toString()
           const result = await this.getTopTraders(wallet, window)
-          let template = `Top traders over (${window}): \`\`\`\n\n`
+          let template = `Top traders over (${window}): \n\n`
+          
           for (let r of result) {
-            template += `${r.rank.toString().padStart(5, ' ')}  ${r.wallet.padEnd(45, ' ')}  ${('Ξ'+(Math.floor(r.volume*100)/100).toFixed(2)).padStart(10, ' ')}\n`
+            // template += `${r.rank.toString().padStart(5, ' ')}  ${r.wallet.padEnd(45, ' ')}  ${('Ξ'+(Math.floor(r.volume*100)/100).toFixed(2)).padStart(10, ' ')}\n`
+            template += `${r.rank.toString()} • ${r.wallet}`
+            if (r.discordUserID) {
+              template += ` • <@${r.discordUserID}>`
+            }
+            template += ` • ${('Ξ'+(Math.floor(r.volume*100)/100).toFixed(2))}\n`
           }
-          template += `\`\`\`\n`
+          template += `\n\n`
           interaction.editReply(template)
         } else if ('owned' === interaction.commandName) {
           await interaction.deferReply()
           const wallet = interaction.options.get('wallet').value.toString()
           let lookupWallet = wallet
           let ensisedWallet = wallet
+          let additionalWallets = []
           try {
-            if (!lookupWallet.startsWith('0x')) {
+            if (lookupWallet.startsWith('<@')) {
+              // it's a discord mention, request the DAO module
+              const discordUserId = lookupWallet.substring(2, lookupWallet.length-1)
+              if (providers.indexOf(DAOService)) {
+                const daoService = this.moduleRef.get(DAOService);
+                const users = daoService.getUsersByDiscordUserId(discordUserId)
+                additionalWallets.push(...users.map(u => u.web3_public_key))
+              }          
+            } else if (!lookupWallet.startsWith('0x')) {
               // try to find the matching wallet
               const address = await this.provider.resolveName(`${wallet}`);
               if (address) lookupWallet = address
@@ -261,13 +276,14 @@ Amount:   ${'Ξ'+(Math.floor(r.amount*100)/100).toFixed(2)}`)
               const ens = await this.provider.lookupAddress(`${wallet}`);
               if (ens) ensisedWallet = ens
             }
+            
           } catch (err) {
             logger.warn(`cannot lookup wallet ${lookupWallet}`)
           }
-          const tokens = await this.getOwnedTokens(lookupWallet)
+          const tokens = await this.getOwnedTokens([lookupWallet, ...additionalWallets])
           if (!tokens.length) {
             await interaction.editReply({
-              content: `Empty wallet: ${wallet}`,
+              content: `Empty wallet(s): ${wallet}`,
               files: [config.discord_empty_wallet_gifs[Math.floor(Math.random()*config.discord_empty_wallet_gifs.length)]]
             });     
           } else {
@@ -356,6 +372,8 @@ Amount:   ${'Ξ'+(Math.floor(r.amount*100)/100).toFixed(2)}`)
           }
 
           let template = config.userStatisticsMessageDiscord
+          
+          template = template.replace(new RegExp('<user_mention>', 'g'), stats.discordUserID ? `<@${stats.discordUserID}>` : '');
           template = template.replace(new RegExp('<last_event>', 'g'), stats.last_event);
           template = template.replace(new RegExp('<wallet>', 'g'), ensisedWallet);
           template = template.replace(new RegExp('<tx_count>', 'g'), stats.transactions);
@@ -451,23 +469,42 @@ Amount:   ${'Ξ'+(Math.floor(r.amount*100)/100).toFixed(2)}`)
       } catch (err) {
         logger.info(err)
       }
-    });      
+    }
+    this.getDiscordInteractionsListeners().push(interaction)
   }
 
-getOwnedTokens(wallet:string) {
-  const sql = `select token_id,
-  ceil(JULIANDAY('now') -
-  JULIANDAY((select max(tx_date) from events e2 where e2.token_id = a.token_id))) owned_since
-  from (select distinct token_id from 
-    (select distinct token_id,
-    last_value(to_wallet) over ( 
-    partition by token_id order by tx_date 
-    RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING ) owner
-    from events) a
-  where lower(a.owner) = lower(@wallet)) a`
-  const result = this.db.prepare(sql).all({wallet})
-  return result
-}
+
+  getMintedTokens(wallets:string[]) {
+    for (let i = 0; i < wallets.length; i++) {
+      wallets[i] = `'${wallets[i].toLowerCase()}'`
+    }
+    const formattedWallets = wallets.join(",")
+    const sql = `select distinct token_id
+    from events
+    where from_wallet = '0x0000000000000000000000000000000000000000' 
+    and lower(to_wallet) IN (`+ formattedWallets +`)`
+    const result = this.db.prepare(sql).all({})
+    return result
+  }
+
+  getOwnedTokens(wallets:string[]) {
+    for (let i = 0; i < wallets.length; i++) {
+      wallets[i] = `'${wallets[i].toLowerCase()}'`
+    }
+    const formattedWallets = wallets.join(",")
+    const sql = `select token_id,
+    ceil(JULIANDAY('now') -
+    JULIANDAY((select max(tx_date) from events e2 where e2.token_id = a.token_id))) owned_since
+    from (select distinct token_id from 
+      (select distinct token_id,
+      last_value(to_wallet) over ( 
+      partition by token_id order by tx_date 
+      RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING ) owner
+      from events) a
+    where lower(a.owner) IN (`+ formattedWallets +`)) a`
+    const result = this.db.prepare(sql).all({})
+    return result
+  }
 
   getPlatformStats(platform:string, stats:any[]) {
     const r = stats.filter(s => s.platform === platform)
@@ -530,6 +567,15 @@ getOwnedTokens(wallet:string) {
       order by tx_date desc
     `
     const row = this.db.prepare(sql).get({wallet})
+
+    if (providers.indexOf(DAOService)) {
+      const daoService = this.moduleRef.get(DAOService);
+      const user = await daoService.getUserByWeb3Wallet(wallet)
+      if (user) {
+        row.discordUserID = user.discord_user_id
+      }
+    }
+
     return row
   }
 
@@ -695,7 +741,18 @@ getOwnedTokens(wallet:string) {
     const result = this.db.prepare(sql).all({wallet})
     for (let r of result) {
       const address = await this.provider.lookupAddress(`${r.wallet}`);
-      if (address) r.wallet = address
+      r.originalWallet = `${r.wallet}`
+      // console.log(r.originalWallet)
+      if (address) {
+        r.wallet = address
+      }
+      if (providers.indexOf(DAOService)) {
+        const daoService = this.moduleRef.get(DAOService);
+        const user = await daoService.getUserByWeb3Wallet(r.originalWallet)
+        if (user) {
+          r.discordUserID = user.discord_user_id
+        }
+      }
     }
     
     return result
