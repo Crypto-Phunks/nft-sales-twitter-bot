@@ -44,8 +44,8 @@ export class BasicMessagingService extends BaseService {
     
     const say = new SlashCommandBuilder()
       .setName('say')
+      .setDescription('Ask the bot to post something in the current channel')
       .addStringOption(option => option.setName('message')
-        .setDescription('Ask the bot to post something in the current channel')
         .setRequired(true))
     
     const commands = [
