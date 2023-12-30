@@ -55,6 +55,7 @@ export class PhunksAuctionFlywheelService extends BaseService {
       platform: 'flywheel',
       transactionDate,
       initialFrom: seller,
+      erc20Token: 'ethereum',
       from: this.shortenAddress('0x0e7f7d8007c0fccac2a813a25f205b9030697856'),
       tokenId: phunkId,
       to: ensTo ?? this.shortenAddress(seller),

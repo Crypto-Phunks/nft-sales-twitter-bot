@@ -22,22 +22,16 @@ const logger = createLogger('phunks.erc721sales.service')
 @Injectable()
 export class PhunksErc721SpecialisedSalesService extends Erc721SalesService {
   
+  
   constructor(
     protected readonly http: HttpService,
   ) {
     super(http)
 
-    const tokenContract = new ethers.Contract(config.contract_address, erc721abi, this.provider);
-    let filter = tokenContract.filters.Transfer();
-    tokenContract.queryFilter(filter, 
-      18146318, 
-      18146318).then(async (events:any) => {
-      for (const event of events) {
-        const request = await this.getTransactionDetails(event)
-        const tweet = await this.tweet(request);
-        await this.discord(request, tweet.id);
-      }
-    });       
+    if (!global.doNotStartAutomatically) {
+      this.startProvider()
+    }
+    //this.test()
   }
   
   async decorateImage(processedImage: Buffer, data:TweetRequest): Promise<Buffer> {
