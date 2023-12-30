@@ -1,9 +1,12 @@
 export interface BindWeb3RequestDto {
     signature:string;
     account:string;
-    discordUserId:string;
-    discordUsername:string;
-    discordAccessToken:string;
+    twitterUserId?:string;
+    twitterState?:string;
+    twitterCode?:string;
+    discordUserId?:string;
+    discordUsername?:string;
+    discordAccessToken?:string;
 }
 
 export interface BindTwitterRequestDto {

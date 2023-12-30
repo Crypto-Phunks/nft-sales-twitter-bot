@@ -18,8 +18,8 @@
                 color: white;
             }
         </style>
-        <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-        <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js" type="application/javascript"></script>
+        <script src="/js/jquery-3.7.1.min.js"></script>
+        <script src="/js/ethers-5.2.umd.min.js" type="application/javascript"></script>
         <script>
             window.onload = () => {
                 let discordUsername, discordUserId, discordAccessToken;
@@ -53,7 +53,7 @@
                     const provider = new ethers.providers.Web3Provider(window.ethereum)
                     provider.send("eth_requestAccounts", []).then(account => {
                         const signer = provider.getSigner()
-                        const signature = signer.signMessage(`This signature is safe and will bind your wallet to your discord user ID.`).then(signature => {
+                        const signature = signer.signMessage(`This signature is safe and will bind your wallet to your DAO user ID.`).then(signature => {
                             console.log(`account: ${account} signature: ${signature}`)
                             sendSignature(account[0], signature, discordUsername, discordUserId, discordAccessToken)
                         });

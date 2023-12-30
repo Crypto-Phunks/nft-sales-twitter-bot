@@ -35,6 +35,7 @@ export class DAOService extends BaseService {
   positionUpdate: any;
   currentBlock: number;
   currentTwitterAuthRequests: Map<string, any> = new Map<string, any>();
+  currentTwitterAuthResponse: Map<string, any> = new Map<string, any>();
   encryptionKeys: Map<string, string> = new Map<string,string>();
 
   constructor(
@@ -87,15 +88,16 @@ export class DAOService extends BaseService {
     this.db.prepare(
       `CREATE TABLE IF NOT EXISTS accounts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        discord_user_id text NOT NULL,
-        discord_username text NOT NULL,
-        web3_public_key text NOT NULL UNIQUE
+        twitter_user_id text,
+        discord_user_id text,
+        discord_username text,
+        web3_public_key text UNIQUE
       );`,
     ).run();
     this.db.prepare(
       `CREATE TABLE IF NOT EXISTS twitter_accounts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        discord_user_id text NOT NULL UNIQUE,
+        discord_user_id text UNIQUE,
         twitter_user_id text NOT NULL UNIQUE,
         twitter_created_at text NOT NULL,
         twitter_name text NOT NULL,
@@ -243,8 +245,13 @@ export class DAOService extends BaseService {
   
   async bindTwitterAccount(request: BindTwitterRequestDto) {
      const infos = this.currentTwitterAuthRequests.get(request.state)
-     const twitterDatas = await this.twitterClient.finalizeLogin(infos, request)
+     this.currentTwitterAuthRequests.delete(request.state)
+     const twitterDatas = await this.twitterClient.finalizeLogin(infos, request.code)
      twitterDatas.discordUserId = infos.discord_user_id
+     if (!twitterDatas.discordUserId) {
+       // it's a twitter only login, keep the response in memory for later
+       this.currentTwitterAuthResponse.set(request.state, twitterDatas)       
+     }
 
     // encrypt datas
     if (config.dao_requires_encryption_key) {
@@ -255,7 +262,7 @@ export class DAOService extends BaseService {
       twitterDatas.createdAt = encrypt(twitterDatas.createdAt, key)
       twitterDatas.name = encrypt(twitterDatas.name, key)
       twitterDatas.username = encrypt(twitterDatas.username, key)
-      twitterDatas.discordUserId = encrypt(twitterDatas.discordUserId, key)
+      if (twitterDatas.discordUserId) twitterDatas.discordUserId = encrypt(twitterDatas.discordUserId, key)
       twitterDatas.accessToken = encrypt(twitterDatas.accessToken, key)
       twitterDatas.refreshToken = encrypt(twitterDatas.refreshToken, key)
     }
@@ -268,27 +275,45 @@ export class DAOService extends BaseService {
           twitter_created_at = excluded.twitter_created_at, twitter_name = excluded.twitter_name,
           twitter_username = excluded.twitter_username, refresh_token = excluded.refresh_token,
           access_token = excluded.access_token
+      ON CONFLICT(twitter_user_id) DO UPDATE 
+      SET discord_user_id = excluded.discord_user_id, twitter_user_id = excluded.twitter_user_id,
+          twitter_created_at = excluded.twitter_created_at, twitter_name = excluded.twitter_name,
+          twitter_username = excluded.twitter_username, refresh_token = excluded.refresh_token,
+          access_token = excluded.access_token          
     `)
     stmt.run(twitterDatas)
+    return twitterDatas
   }
 
   async bindWeb3Account(request: BindWeb3RequestDto) {
-
-    // TODO check discord account
-    const { data } = await firstValueFrom(this.http.get('https://discord.com/api/users/@me', {
-      headers: {
-        authorization: `Bearer ${request.discordAccessToken}`,
-      }
-    }).pipe(
-      catchError((error: AxiosError) => {
-        logger.error(error)
-        throw 'An error happened!';
-      }),
-    ))
-    if (data.id != request.discordUserId) {
-      throw new SignatureError('invalid discord user id')
+    if (!request.discordUserId && !request.twitterUserId) {
+      throw new SignatureError('no correlation id')
     }
-    const signerAddr = await ethers.verifyMessage('This signature is safe and will bind your wallet to your discord user ID.', request.signature);
+    if (request.twitterUserId) {
+      const twitterDatas = this.currentTwitterAuthResponse.get(request.twitterState)
+      this.currentTwitterAuthResponse.delete(request.twitterState)
+      
+      if (twitterDatas.id != request.twitterUserId) {
+        throw new SignatureError('invalid twitter user id')
+      }
+    }
+    if (request.discordUserId) {
+      const { data } = await firstValueFrom(this.http.get('https://discord.com/api/users/@me', {
+        headers: {
+          authorization: `Bearer ${request.discordAccessToken}`,
+        }
+      }).pipe(
+        catchError((error: AxiosError) => {
+          logger.error(error)
+          throw 'An error happened!';
+        }),
+      ))
+      if (data.id != request.discordUserId) {
+        throw new SignatureError('invalid discord user id')
+      }
+    }
+
+    const signerAddr = await ethers.verifyMessage('This signature is safe and will bind your wallet to your DAO user ID.', request.signature);
     if (signerAddr.toLowerCase() !== request.account.toLowerCase()) {
       throw new SignatureError('invalid signature')
     }
@@ -301,13 +326,19 @@ export class DAOService extends BaseService {
       request.discordUsername = encrypt(request.discordUsername, key)
       request.discordUserId = encrypt(request.discordUserId, key)
     }
+    if (!request.discordUserId) {
+      request.discordUserId = null
+      request.discordUsername = null
+    }
 
     //console.log('request', request)
 
     const stmt = this.db.prepare(`
-      INSERT INTO accounts (discord_user_id, discord_username, web3_public_key)
-      VALUES (@discordUserId, @discordUsername, @account)
-      ON CONFLICT(web3_public_key) DO UPDATE SET discord_user_id = excluded.discord_user_id, discord_username = excluded.discord_username
+      INSERT INTO accounts (discord_user_id, discord_username, twitter_user_id, web3_public_key)
+      VALUES (@discordUserId, @discordUsername, @twitterUserId, @account)
+      ON CONFLICT(web3_public_key) DO UPDATE 
+      SET discord_user_id = excluded.discord_user_id, discord_username = excluded.discord_username,
+      twitter_user_id = excluded.twitter_user_id
     `)
     stmt.run(request)
   }
@@ -834,6 +865,12 @@ export class DAOService extends BaseService {
       }
     }
     this.getDiscordInteractionsListeners().push(listener)
+  }
+
+  async startTwitterLogin() {
+    const result = await this.twitterClient.startLogin() as any
+    this.currentTwitterAuthRequests.set(result.state, result)
+    return result
   }
 
   formatVoteMessage(description:string, until:Date, link:string, roleRequired:string, minimumVotesRequired:number, voteCount:number=0) {

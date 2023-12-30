@@ -4,12 +4,12 @@ import { BindTwitterRequestDto, BindWeb3RequestDto } from './models';
 import { DAOService } from './dao.extension.service';
 import { SignatureError } from './errors';
 import { encrypt } from './crypto';
+import TwitterClient from 'src/clients/twitter';
 
 @Controller('dao')
 export class DAOController {
-
+  
   constructor(private daoService:DAOService) {
-
   }
   
   @Get('status')
@@ -24,15 +24,25 @@ export class DAOController {
   }
 
   @Post('bind/twitter')
-  bindTwitter(@Body() request: BindTwitterRequestDto): any {
+  async bindTwitter(@Body() request: BindTwitterRequestDto):Promise<any> {
     console.log(request)
     try {
-      this.daoService.bindTwitterAccount(request)
+      const result = {result: 'ok'}
+      const infos = await this.daoService.bindTwitterAccount(request)
+      result['twitterId'] = infos.id
+      result['twitterUsername'] = infos.username
+      result['discordUserId'] = infos.discordUserId
+      return result
     } catch (error) {
       console.log('error', error)
       return {result: 'ko'};
     }
-    return {result: 'ok'};
+  }
+
+  @Post('bind/twitter/url')
+  async getTwitterURL(): Promise<any> {
+    const result = await this.daoService.startTwitterLogin() as any
+    return {url: result.url};
   }
 
   @Post('bind/web3')
