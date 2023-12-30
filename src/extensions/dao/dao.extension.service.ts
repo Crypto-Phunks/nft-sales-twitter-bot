@@ -694,8 +694,8 @@ export class DAOService extends BaseService {
           const description = poll.description
           const minimumVotesRequired = poll.minimum_votes_required
           const until = parseISO(poll.until)
-          const untilUTC = utcToZonedTime(until, 'Etc/UTC');
-          const embed = this.formatVoteMessage(description, untilUTC, link, roleRequired, minimumVotesRequired)
+          //const untilUTC = utcToZonedTime(until, 'Etc/UTC');
+          const embed = this.formatVoteMessage(description, until, link, roleRequired, minimumVotesRequired)
 
           if (embed.description.length >= 4000) {
             await interaction.editReply(`Your message is too long, please reduce it.`)
