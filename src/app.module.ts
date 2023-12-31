@@ -14,6 +14,7 @@ import { DAOService } from './extensions/dao/dao.extension.service';
 import { DAOController } from './extensions/dao/dao.controller';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
+import { JwtModule } from '@nestjs/jwt';
 
 export const providers = [
   Erc721SalesService,
@@ -34,6 +35,11 @@ export const providers = [
 @Module({
   imports: [
     HttpModule,
+    JwtModule.register({
+      global: true,
+      secret: process.env.JWT_SECRET,
+      signOptions: { expiresIn: '1d' },
+    }),
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'client'),
     })],

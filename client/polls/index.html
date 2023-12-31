@@ -10,6 +10,12 @@
                 font-family: "Roboto Mono";
                 background: #222;
                 color: white;
+                padding: 20px;
+            }
+            .emoji {
+                font-size: 30px;
+                vertical-align: middle;
+                cursor: pointer;
             }
             h1 {
                 font-family: "Retro Computer";
@@ -32,17 +38,27 @@
 
         <script id="poll-template" type="x-tmpl-mustache">
             {{#datas}}
-            <h2 style="margin-top: 50px">Poll #{{ id }}</h2>
-            <p>{{ description }}</p>
             <div style="margin-bottom: 40px">
-                {{#formatDate}}{{ until }}{{/formatDate}} ({{until}} UTC)
-                — <a href="https://discord.com/channels/{{ discord_guild_id }}/{{ discord_channel_id }}/{{ poll.discord_message_id }}">[discord link]</a>
+                <h2 style="margin-top: 50px">Poll #{{ id }}</h2>
+                <p>{{ description }}</p>
+                <div>
+                    {{#formatDate}}{{ until }}{{/formatDate}} ({{until}} UTC)
+                    — <a href="https://discord.com/channels/{{ discord_guild_id }}/{{ discord_channel_id }}/{{ poll.discord_message_id }}">[discord link]</a>
+                </div>
+                <div class="votes">
+                    Cast your vote: 
+                    {{#allowed_emojis}}
+                        <span class="emoji" data-vote-id="{{ id }}">{{.}}</span>
+                    {{/allowed_emojis}}                
+                </div>
             </div>
             {{/datas}}
         </script>        
         <script type="module">
-            import Mustache from 'https://cdnjs.cloudflare.com/ajax/libs/mustache.js/4.2.0/mustache.min.js'
-            import { formatDistance } from 'https://esm.run/date-fns'
+            import Mustache from '/js/mustache.min.js'
+            import { formatDistance } from '/js/date-fns.js'
+
+            let currentUser = null
 
             window.onload = async () => {
                 setTimeout(() => load(), 500)
@@ -72,11 +88,43 @@
                 const result = document.getElementById('result')
                 result.innerHTML = rendered;
                 result.style.display = 'block'
-                document.getElementById('loading').style.display = 'none'                
+                $(".emoji").click(async function() {
+                    const voteId = $(this).data('vote-id')
+                    console.log('emoji clicked', voteId)
+                    if (!currentUser) {
+                        await login()
+                    }
+                })
+                document.getElementById('loading').style.display = 'none'      
+            }
+
+            async function login() {
+                const provider = new ethers.providers.Web3Provider(window.ethereum)
+                const wallet = await provider.send("eth_requestAccounts", [])
+                const signer = provider.getSigner()
+                const signature = await signer.signMessage(`This signature is safe and will bind your wallet to your DAO user ID.`)
+                console.log(`account: ${wallet} signature: ${signature}`)
+
+                const result = await fetch('/dao/signin/web3', {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ 
+                            wallet: wallet[0],
+                            signature,                   
+                        })
+                    })   
+                const response = await result.json()
+                console.log(response)
+                currentUser = response
             }
         </script>        
-        <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+        <script src="/js/jquery-3.7.1.min.js"></script>
+        <script src="/js/ethers-5.2.umd.min.js" type="application/javascript"></script>
+        <script src="/js/mustache.min.js" type="application/javascript"></script>
+        <script src="/js/moment.min.js"></script>
     </head>
     <body>
         <h1>Cryptophunk Open Polls</h1>

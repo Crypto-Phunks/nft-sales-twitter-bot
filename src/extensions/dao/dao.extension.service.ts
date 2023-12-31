@@ -156,7 +156,7 @@ export class DAOService extends BaseService {
           const members = await guild.members.fetch({ force: true })
           for (const m of members) {
             const member = m[1]
-            //logger.info(`checking ${member.displayName} for role ${role.name}`)
+            // logger.info(`checking ${member.displayName} for role ${role.name}`)
             const users = this.getUsersByDiscordUserId(member.id.toString()) ?? []
             const twitterUsers = this.getTwitterUsersByDiscordUserId(member.id.toString()) ?? []
 
@@ -313,10 +313,7 @@ export class DAOService extends BaseService {
       }
     }
 
-    const signerAddr = await ethers.verifyMessage('This signature is safe and will bind your wallet to your DAO user ID.', request.signature);
-    if (signerAddr.toLowerCase() !== request.account.toLowerCase()) {
-      throw new SignatureError('invalid signature')
-    }
+    this.checkWeb3Signature({wallet: request.account, signature: request.signature})
     
     // encrypt datas
     if (config.dao_requires_encryption_key) {
@@ -325,6 +322,9 @@ export class DAOService extends BaseService {
       request.account = encrypt(request.account, key)
       request.discordUsername = encrypt(request.discordUsername, key)
       request.discordUserId = encrypt(request.discordUserId, key)
+    }
+    if (!request.twitterUserId) {
+      request.twitterUserId = null
     }
     if (!request.discordUserId) {
       request.discordUserId = null
@@ -341,6 +341,13 @@ export class DAOService extends BaseService {
       twitter_user_id = excluded.twitter_user_id
     `)
     stmt.run(request)
+  }
+
+  async checkWeb3Signature(request: {wallet:string, signature:string}) {
+    const signerAddr = await ethers.verifyMessage('This signature is safe and will bind your wallet to your DAO user ID.', request.signature);
+    if (signerAddr.toLowerCase() !== request.wallet.toLowerCase()) {
+      throw new SignatureError('invalid signature')
+    }
   }
 
   hasGracePeriod(guildId: string, userId: string, roleId: string) {
@@ -549,7 +556,9 @@ export class DAOService extends BaseService {
     }
     const guild = this.discordClient.getClient().guilds.cache.get(guildId)
     const member = await guild.members.cache.get(userId)
-    if (poll.discord_role_id && !member.roles.cache.has(poll.discord_role_id)) {
+    if (member.user.bot) return
+    // if (poll.discord_role_id && !member.roles.cache.has(poll.discord_role_id)) {    
+    if (poll.discord_role_id && (member as any)._roles.indexOf(poll.discord_role_id) === -1) {
       try {
         const dm = await member.createDM(true)
         await dm.send("You don't have the required role to vote on this poll.")
