@@ -25,6 +25,14 @@ export const config = {
   discord_client_id: '1139547496033558561',
   discord_guild_ids: '880485569652740136,968448656221011978',
   dao_requires_encryption_key: false,
+  dao_web_vote_requirements: [
+    {
+      name: 'Owned 1 Phunk for 30 days',
+      roleId: '1190002144544305262',
+      minOwnedCount: 1,
+      minOwnedTime: 30, // in days
+    },   
+  ],
   dao_roles: [
     /*
     {

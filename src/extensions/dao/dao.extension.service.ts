@@ -10,7 +10,7 @@ import { config } from '../../config';
 import { PermissionFlagsBits, Routes } from 'discord-api-types/v9'
 import { ethers } from 'ethers';
 import { BindWeb3RequestDto, BindTwitterRequestDto, BindTwitterResultDto, DAORoleConfigurationDto } from './models';
-import { SignatureError } from './errors';
+import { MissingRequirementError, SignatureError } from './errors';
 import { catchError, firstValueFrom } from 'rxjs';
 import { AxiosError } from 'axios';
 import { StatisticsService } from '../statistics.extension.service';
@@ -130,6 +130,7 @@ export class DAOService extends BaseService {
         user_id INTEGER NOT NULL,
         vote_value text NOT NULL,
         voted_at text NOT NULL,
+        ip_address text,
         vote_origin text
       );`,
     ).run();
@@ -556,7 +557,7 @@ export class DAOService extends BaseService {
     return info.lastInsertRowid
   }
 
-  async createPollVote(guildId:string, voteId:string, userId:number, value:string) {
+  async createPollVote(guildId:string, voteId:string, userId:number, value:string, ipAddress:string=undefined) {
     const user = this.getUserById(userId)
     let poll = this.db.prepare(`SELECT * FROM polls WHERE id = @voteId`).get({voteId})
     let initialPoll = poll
@@ -589,7 +590,12 @@ export class DAOService extends BaseService {
     } else {
       // check role vote web
       logger.info('checking role vote web')
-
+      for (const requirement of config.dao_web_vote_requirements) {
+        const check = await this.checkCondition(requirement, [user])
+        if (!check) {
+          throw new MissingRequirementError(`You don't fullfil some requirements for this poll: ${requirement.name}`)
+        }
+      }
     }
 
     this.db.prepare(`
@@ -600,15 +606,15 @@ export class DAOService extends BaseService {
       voteId: initialPoll.id, userId
     })
     const stmt = this.db.prepare(`
-      INSERT INTO poll_votes (poll_id, user_id, vote_value, voted_at, vote_origin)
-      VALUES (@pollId, @userId, @value, datetime(), @voteOrigin)
+      INSERT INTO poll_votes (poll_id, user_id, vote_value, voted_at, vote_origin, ip_address)
+      VALUES (@pollId, @userId, @value, datetime(), @voteOrigin, @ipAddress)
     `)    
     const voteOrigin = 
       guildId === 'web' ? 'web' :
       `https://discord.com/channels/${poll.discord_guild_id}/${poll.discord_channel_id}/${poll.discord_message_id}`
     stmt.run({
       pollId: initialPoll.id, 
-      userId, value, voteOrigin
+      userId, value, voteOrigin, ipAddress
     })
 
     if (guildId !== 'web') {
@@ -834,7 +840,7 @@ export class DAOService extends BaseService {
           voteDetails.forEach(vote => {
             
             if (vote.discord_user_id === null) {
-              response += `${vote.vote_value} ${vote.web3_public_key.substring(0, 6)}...${vote.web3_public_key.substring(vote.web3_public_key.length-6, vote.web3_public_key.length)} (${vote.voted_at}) using the web UI \n`
+              response += `${vote.vote_value} ${vote.web3_public_key.substring(0, 6)}...${vote.web3_public_key.substring(vote.web3_public_key.length-6, vote.web3_public_key.length)} (${vote.voted_at}) using the web UI (${vote.ip_address}) \n`
             } else {
               response += `${vote.vote_value} <@${vote.discord_user_id}> (${vote.voted_at}) on ${vote.vote_origin} \n`
             }

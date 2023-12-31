@@ -56,9 +56,14 @@ export class DAOController {
   @UseGuards(AuthGuard)
   @Post('vote')
   async vote(@Request() req) {
-    const { emoji, voteMessageId } = req.query
-    console.log('vote', emoji, voteMessageId)
-    this.daoService.createPollVote('web', voteMessageId, req.user.sub, emoji)
+    const { emoji, pollId } = req.query
+    console.log('vote', emoji, pollId)
+    try {
+      await this.daoService.createPollVote('web', pollId, req.user.sub, emoji, req.ip)
+    } catch (error: any) {
+      console.log('error', error.message)
+      return {result: 'ko', error: error.message};
+    }
     return req.user;
   }  
   

@@ -25,7 +25,8 @@ export interface BindTwitterResultDto {
 }
 
 export interface DAORoleConfigurationDto {
-    guildId:string,
+    guildId?:string,
+    name?:string,
     roleId:string,
     gracePeriod?:number,
     twitter?:any,

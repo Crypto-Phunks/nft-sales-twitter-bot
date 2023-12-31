@@ -116,7 +116,7 @@
                 result.innerHTML = rendered;
                 result.style.display = 'block'
                 $(".emoji").click(async function() {
-                    const voteId = $(this).data('poll-id')
+                    const pollId = $(this).data('poll-id')
                     console.log('emoji clicked', pollId)
                     if (!pollId) {
                         return
@@ -145,6 +145,9 @@
                     })
                 const response = await result.json()                
                 console.log(response)
+                if (response.result === 'ko') {
+                    alert(response.error)
+                }
             }
 
             async function login(callback) {
