@@ -12,10 +12,20 @@
                 color: white;
                 padding: 20px;
             }
+            .votes {
+                margin-top: 20px;
+            }
             .emoji {
-                font-size: 30px;
+                font-size: 20px;
                 vertical-align: middle;
                 cursor: pointer;
+                display: inline-block;
+                padding: 5px 15px;
+                background: #333;
+                border-radius: 5px;
+            }
+            .emoji:hover {
+                background: #444;
             }
             h1 {
                 font-family: "Retro Computer";
@@ -37,6 +47,7 @@
         </style>
 
         <script id="poll-template" type="x-tmpl-mustache">
+            {{^datas.0}}No upcoming votes, check back later.{{/datas.0}}
             {{#datas}}
             <div style="margin-bottom: 40px">
                 <h2 style="margin-top: 50px">Poll #{{ id }}</h2>
@@ -92,13 +103,32 @@
                     const voteId = $(this).data('vote-id')
                     console.log('emoji clicked', voteId)
                     if (!currentUser) {
-                        await login()
+                        await login((currentUser) => {
+                            vote($(this).text(), voteId)
+                        })
+                        return
                     }
+                    vote($(this).text(), voteId)
                 })
                 document.getElementById('loading').style.display = 'none'      
             }
 
-            async function login() {
+            async function vote(emoji, voteMessageId) {
+                console.log('vote()', emoji, voteMessageId, currentUser);
+
+                const result = await fetch(`/dao/vote?voteMessageId=${voteMessageId}&emoji=${emoji}`, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${currentUser.accessToken}`
+                        }
+                    })
+                const response = await result.json()                
+                console.log(response)
+            }
+
+            async function login(callback) {
                 const provider = new ethers.providers.Web3Provider(window.ethereum)
                 const wallet = await provider.send("eth_requestAccounts", [])
                 const signer = provider.getSigner()
@@ -117,8 +147,13 @@
                         })
                     })   
                 const response = await result.json()
-                console.log(response)
+                
                 currentUser = response
+                console.log('currentUser', currentUser)
+
+                if (callback) {
+                    callback(currentUser)
+                }
             }
         </script>        
         <script src="/js/jquery-3.7.1.min.js"></script>

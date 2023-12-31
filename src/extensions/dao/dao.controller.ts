@@ -1,4 +1,4 @@
-import { Body, Request, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Request, Controller, Get, Post, UseGuards, Param } from '@nestjs/common';
 import { BindTwitterRequestDto, BindWeb3RequestDto } from './models';
 import { DAOService } from './dao.extension.service';
 import { JwtService } from '@nestjs/jwt';
@@ -53,6 +53,9 @@ export class DAOController {
   @UseGuards(AuthGuard)
   @Post('vote')
   async vote(@Request() req) {
+    const { emoji, voteMessageId } = req.query
+    console.log('vote', emoji, voteMessageId)
+    this.daoService.createPollVote('web', voteMessageId, req.user.sub, emoji)
     return req.user;
   }  
   
@@ -60,7 +63,14 @@ export class DAOController {
   async web3Signin(@Body() request: {wallet:string, signature:string}): Promise<any> {
     await this.daoService.checkWeb3Signature(request)
 
-    const user = this.daoService.getUserByWeb3Wallet(request.wallet)
+    let user = this.daoService.getUserByWeb3Wallet(request.wallet)
+    if (!user) {
+      this.daoService.bindWeb3Account({
+        account: request.wallet,
+        signature: request.signature
+      })
+      user = this.daoService.getUserByWeb3Wallet(request.wallet)
+    }
     const payload = { sub: user.id, 
       wallet: request.wallet
     };    

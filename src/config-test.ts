@@ -143,5 +143,5 @@ export const config = {
     new BlurIOSweepParser(), // must be the last blurio parsers
   ] as LogParser[],
   daoModuleListenAddress: 'localhost',
-  twitterAPIRedirectURL: `http://localhost:3000/twitter/`
+  twitterAPIRedirectURL: `http://localhost:3000/twitter`
 };

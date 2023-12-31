@@ -22,6 +22,7 @@ import { unique } from 'src/utils/array.utils';
 import { decrypt, encrypt } from './crypto';
 import { de } from 'date-fns/locale';
 import { utcToZonedTime } from 'date-fns-tz';
+import { get } from 'http';
 
 const logger = createLogger('dao.extension.service')
 
@@ -125,9 +126,8 @@ export class DAOService extends BaseService {
     this.db.prepare(
       `CREATE TABLE IF NOT EXISTS poll_votes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        discord_guild_id text NOT NULL,
-        discord_message_id text NOT NULL,
-        discord_user_id text NOT NULL,
+        poll_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
         vote_value text NOT NULL,
         voted_at text NOT NULL,
         vote_origin text
@@ -286,9 +286,11 @@ export class DAOService extends BaseService {
   }
 
   async bindWeb3Account(request: BindWeb3RequestDto) {
+    /*
     if (!request.discordUserId && !request.twitterUserId) {
       throw new SignatureError('no correlation id')
     }
+    */
     if (request.twitterUserId) {
       const twitterDatas = this.currentTwitterAuthResponse.get(request.twitterState)
       this.currentTwitterAuthResponse.delete(request.twitterState)
@@ -412,6 +414,13 @@ export class DAOService extends BaseService {
     `).get({id})
   }
 
+  getPollByDiscordMessageId(id:string) {
+    return this.db.prepare(`
+      SELECT * FROM polls
+      WHERE discord_message_id = :id
+    `).get({id})
+  }
+
   async closePoll(messageId:string) {
     const poll = this.getPoll(messageId)
     this.db.prepare(`UPDATE polls SET until = DATETIME('now', '-5 minutes')
@@ -493,22 +502,22 @@ export class DAOService extends BaseService {
     setTimeout(() => this.handleEndedPolls(), 60000*10)
   }
 
-  getPollResults(discord_message_id: any) {
+  getPollResults(voteId: any) {
     const votesStmt = this.db.prepare(`
         SELECT vote_value, count(*) as count FROM poll_votes
-        WHERE discord_message_id = @messageId
+        WHERE poll_id = @voteId
         group by 1
       `)  
-    return votesStmt.all({messageId: discord_message_id})
+    return votesStmt.all({voteId})
   }
 
-  getDetailedPollResults(discord_message_id: any) {
+  getDetailedPollResults(voteId: any) {
     const votesStmt = this.db.prepare(`
-        SELECT * FROM poll_votes
-        WHERE discord_message_id = @messageId
-        group by 1
+      SELECT * FROM poll_votes pv, accounts a
+      WHERE a.id = pv.user_id and poll_id = @voteId
+      group by 1
       `)  
-    return votesStmt.all({messageId: discord_message_id})
+    return votesStmt.all({voteId})
   }
 
   removeGracePeriod(guildId: string, userId: string, roleId: string) {
@@ -544,8 +553,9 @@ export class DAOService extends BaseService {
     return info.lastInsertRowid
   }
 
-  async createPollVote(guildId:string, messageId:string, userId:string, value:string) {
-    let poll = this.db.prepare(`SELECT * FROM polls WHERE discord_message_id = @messageId`).get({messageId})
+  async createPollVote(guildId:string, voteId:string, userId:number, value:string) {
+    const user = this.getUserById(userId)
+    let poll = this.db.prepare(`SELECT * FROM polls WHERE id = @voteId`).get({voteId})
     let initialPoll = poll
     if (poll.linked_poll_id !== null) {
       initialPoll = this.db.prepare(`SELECT * FROM polls WHERE id = @id`).get({id: poll.linked_poll_id})
@@ -554,45 +564,58 @@ export class DAOService extends BaseService {
       console.log('not an allowed emoji')
       return
     }
-    const guild = this.discordClient.getClient().guilds.cache.get(guildId)
-    const member = await guild.members.cache.get(userId)
-    if (member.user.bot) return
-    // if (poll.discord_role_id && !member.roles.cache.has(poll.discord_role_id)) {    
-    if (poll.discord_role_id && (member as any)._roles.indexOf(poll.discord_role_id) === -1) {
-      try {
-        const dm = await member.createDM(true)
-        await dm.send("You don't have the required role to vote on this poll.")
-      } catch (err) {
-        // ignored, dm disabled by user
-      }
-      return
-    } 
+
+    if (guildId !== 'web') {
+      const guild = this.discordClient.getClient().guilds.cache.get(guildId)
+      const member = await guild.members.cache.get(user.discord_user_id)
+      if (member.user.bot) return
+      // if (poll.discord_role_id && !member.roles.cache.has(poll.discord_role_id)) {    
+      if (poll.discord_role_id && (member as any)._roles.indexOf(poll.discord_role_id) === -1) {
+        try {
+          const dm = await member.createDM(true)
+          await dm.send("You don't have the required role to vote on this poll.")
+        } catch (err) {
+          // ignored, dm disabled by user
+        }
+        return
+      } 
+    } else {
+      // check role vote web
+      logger.info('checking role vote web')
+    }
+
     this.db.prepare(`
       DELETE FROM poll_votes WHERE 
-      discord_guild_id = @guildId AND
-      discord_message_id = @messageId AND
-      discord_user_id = @userId
+      poll_id = @voteId AND
+      user_id = @userId
     `).run({
-      guildId: initialPoll.discord_guild_id, messageId: initialPoll.discord_message_id, userId
+      voteId: initialPoll.id, userId
     })
     const stmt = this.db.prepare(`
-      INSERT INTO poll_votes (discord_guild_id, discord_message_id, discord_user_id, vote_value, voted_at, vote_origin)
-      VALUES (@guildId, @messageId, @userId, @value, datetime(), @voteOrigin)
+      INSERT INTO poll_votes (poll_id, user_id, vote_value, voted_at, vote_origin)
+      VALUES (@pollId, @userId, @value, datetime(), @voteOrigin)
     `)    
-    const voteOrigin = `https://discord.com/channels/${poll.discord_guild_id}/${poll.discord_channel_id}/${poll.discord_message_id}`
+    const voteOrigin = 
+      guildId === 'web' ? 'web' :
+      `https://discord.com/channels/${poll.discord_guild_id}/${poll.discord_channel_id}/${poll.discord_message_id}`
     stmt.run({
-      guildId:initialPoll.discord_guild_id, 
-      messageId: initialPoll.discord_message_id, userId, value, voteOrigin
+      pollId: initialPoll.id, 
+      userId, value, voteOrigin
     })
-    try {
-      const dm = await member.createDM(true)
-      await dm.send(`Your vote on https://discord.com/channels/${poll.discord_guild_id}/${poll.discord_channel_id}/${poll.discord_message_id} has been recorded.`)
-    } catch (err) {
-      // ignored, dm disabled by user
-    }    
+
+    if (guildId !== 'web') {
+      const guild = this.discordClient.getClient().guilds.cache.get(guildId)
+      const member = await guild.members.cache.get(user.discord_user_id)      
+      try {
+        const dm = await member.createDM(true)
+        await dm.send(`Your vote on https://discord.com/channels/${poll.discord_guild_id}/${poll.discord_channel_id}/${poll.discord_message_id} has been recorded.`)
+      } catch (err) {
+        // ignored, dm disabled by user
+      }    
+    }
 
     // update poll message if a minimum number of votes is required
-    const voteCount = this.getPollResults(messageId).reduce((a, b) => a + b.count, 0)
+    const voteCount = this.getPollResults(voteId).reduce((a, b) => a + b.count, 0)
     const channel = await this.discordClient.getClient().channels.cache.get(poll.discord_channel_id) as TextChannel;
     if (!channel) {
       logger.warn(`cannot find channel for ended vote: ${poll.discord_channel_id}`)
@@ -801,7 +824,13 @@ export class DAOService extends BaseService {
           response += `\nDetailed votes: \n\n`
           const voteDetails = this.getDetailedPollResults(messageId)
           voteDetails.forEach(vote => {
-            response += `${vote.vote_value} <@${vote.discord_user_id}> (${vote.voted_at}) on ${vote.vote_origin} \n`
+            
+            if (vote.discord_user_id === null) {
+              response += `${vote.vote_value} ${vote.web3_public_key.substring(0, 6)}...${vote.web3_public_key.substring(vote.web3_public_key.length-6, vote.web3_public_key.length)} (${vote.voted_at}) using the web UI \n`
+            } else {
+              response += `${vote.vote_value} <@${vote.discord_user_id}> (${vote.voted_at}) on ${vote.vote_origin} \n`
+            }
+
             if (response.length > 1500) {
               response += `\n——— continued in next message ———\n`
               interaction.followUp({ephemeral: true, content: response})
@@ -911,11 +940,17 @@ export class DAOService extends BaseService {
   bindReactionCollector(message: Message) {
     console.log(`bindReactionCollector ${message}`)
     let collector = message.createReactionCollector({});
+    const poll = this.getPollByDiscordMessageId(message.id)
 
-    collector.on('collect', async (reaction, user) => {
+    collector.on('collect', async (reaction, discordUser) => {
       //console.log('reaction added', reaction, user);
-      await this.createPollVote(message.guildId, message.id, user.id, reaction.emoji.name)
-      await reaction.users.remove(user)
+      const user = this.getUsersByDiscordUserId(discordUser.id.toString())
+      if (user.length === 0) {
+        logger.warn("cannot find user for reaction", discordUser.id)
+        return
+      }
+      await this.createPollVote(message.guildId, poll.id, user[0].id, reaction.emoji.name)
+      await reaction.users.remove(discordUser)
     });
   }
 
@@ -927,6 +962,7 @@ export class DAOService extends BaseService {
     }
     const rows = this.db.prepare(`
       SELECT * FROM accounts WHERE discord_user_id = @id
+      ORDER BY id
     `).all({id})
     if (config.dao_requires_encryption_key) {
       // TODO handle guild id
@@ -975,6 +1011,21 @@ export class DAOService extends BaseService {
     const row = this.db.prepare(`
       SELECT * FROM accounts WHERE lower(web3_public_key) = lower(@wallet)
     `).get({wallet})
+
+    // TODO handle guild id
+    if (config.dao_requires_encryption_key && row) {
+      const key = this.encryptionKeys.values().next().value
+      row.discord_user_id = decrypt(row.discord_user_id, key)
+      row.discord_username = decrypt(row.discord_username, key)
+      row.web3_public_key = decrypt(row.web3_public_key, key)
+    }
+    return row
+  }
+
+  getUserById(id: number) {
+    const row = this.db.prepare(`
+      SELECT * FROM accounts WHERE id = @id
+    `).get({id})
 
     // TODO handle guild id
     if (config.dao_requires_encryption_key && row) {
