@@ -9,7 +9,7 @@ import { REST } from '@discordjs/rest';
 import { config } from '../../config';
 import { PermissionFlagsBits, Routes } from 'discord-api-types/v9'
 import { ethers } from 'ethers';
-import { BindWeb3RequestDto, BindTwitterRequestDto, BindTwitterResultDto } from './models';
+import { BindWeb3RequestDto, BindTwitterRequestDto, BindTwitterResultDto, DAORoleConfigurationDto } from './models';
 import { SignatureError } from './errors';
 import { catchError, firstValueFrom } from 'rxjs';
 import { AxiosError } from 'axios';
@@ -144,12 +144,61 @@ export class DAOService extends BaseService {
     ).run();
   }
 
+  async checkCondition(conf:DAORoleConfigurationDto, users:any[]) {
+    if (users.length === 0) return false
+    if (providers.indexOf(StatisticsService) === 0) return false
+    const statisticsService = this.moduleRef.get(StatisticsService);  
+    let conditionSucceeded = false
+    if (conf.minOwnedCount) {
+      const owned = await statisticsService.getOwnedTokens(users.map(u => u.web3_public_key))
+      conditionSucceeded = owned.length >= conf.minOwnedCount
+      if (conditionSucceeded && conf.minOwnedTime) {
+        const maxOwnedTime = Math.max(...owned.map(o => o.owned_since))
+        
+        if (maxOwnedTime < conf.minOwnedTime) {
+          conditionSucceeded = false
+        }
+      }
+    } else if (conf.minted) {
+      const numberMinted = await statisticsService.getMintedTokens(users.map(u => u.web3_public_key))
+      conditionSucceeded = numberMinted.length > 0
+    } else if (conf.twitter) {
+      conditionSucceeded = true
+      
+      const twitterUser = this.getTwitterUsersByUserIds(users.map(u => u.id))
+      if (!twitterUser.length) conditionSucceeded = false
+      if (conditionSucceeded && conf.twitter.age) {
+        // check age
+        const beforeDate = format(new Date().getTime() - conf.twitter.age*1000, "yyyy-MM-dd'T'HH:mm:ss'Z'")
+
+        if (new Date(beforeDate).getTime() > new Date(twitterUser.twitter_created_at).getTime()) {
+          conditionSucceeded = false
+        }
+      }
+    } else if (conf.specificTrait) {
+      const owned = await statisticsService.getOwnedTokens(users.map(u => u.web3_public_key))
+      const matching = owned.map(async (o) => {
+        const tokenId = o.token_id.toString().padStart(4, '0')
+        const metadata = await this.getTokenMetadata(tokenId, false)
+        let result = false
+        if (conf.specificTrait.traitType) {
+          const toCheck = metadata.metadata.attributes.filter(a => a.trait_type === conf.specificTrait.traitType)
+          result = toCheck.length && toCheck[0].value === conf.specificTrait.traitValue
+        } else if (conf.specificTrait.hasOwnProperty('count')) {
+          result = metadata.metadata.attributes.length >= conf.specificTrait.count
+        }
+        return result ? o : undefined
+      })
+      let r = await Promise.all(matching)
+      r = r.filter(o => o !== undefined)
+      conditionSucceeded = r.length > 0
+    }    
+  }
+
   async grantRoles() {
     try {
       if (providers.indexOf(StatisticsService) >= 0) {
         // logger.info(`grantRoles()`)
-        const statisticsService = this.moduleRef.get(StatisticsService);
-
         for (let conf of config.dao_roles) {
           const guild = await this.discordClient.getClient().guilds.fetch(conf.guildId)
           const role = await guild.roles.fetch(conf.roleId)
@@ -158,54 +207,9 @@ export class DAOService extends BaseService {
             const member = m[1]
             // logger.info(`checking ${member.displayName} for role ${role.name}`)
             const users = this.getUsersByDiscordUserId(member.id.toString()) ?? []
-            const twitterUsers = this.getTwitterUsersByDiscordUserId(member.id.toString()) ?? []
+            //const twitterUsers = this.getTwitterUsersByDiscordUserId(member.id.toString()) ?? []
 
-            let conditionSucceeded = false            
-            if (users.length || twitterUsers.length) {
-              if (conf.minOwnedCount) {
-                const owned = await statisticsService.getOwnedTokens(users.map(u => u.web3_public_key))
-                conditionSucceeded = owned.length >= conf.minOwnedCount
-                if (conditionSucceeded && conf.minOwnedTime) {
-                  const maxOwnedTime = Math.max(...owned.map(o => o.owned_since))
-                  
-                  if (maxOwnedTime < conf.minOwnedTime) {
-                    conditionSucceeded = false
-                  }
-                }
-              } else if (conf.minted) {
-                const numberMinted = await statisticsService.getMintedTokens(users.map(u => u.web3_public_key))
-                conditionSucceeded = numberMinted.length > 0
-              } else if (conf.twitter) {
-                conditionSucceeded = true
-                const twitterUser = this.getTwitterUsersByDiscordUserId(member.id.toString())
-                if (!twitterUser.length) conditionSucceeded = false
-                if (conditionSucceeded && conf.twitter.age) {
-                  // check age
-                  const beforeDate = format(new Date().getTime() - conf.twitter.age*1000, "yyyy-MM-dd'T'HH:mm:ss'Z'")
-
-                  if (new Date(beforeDate).getTime() > new Date(twitterUser.twitter_created_at).getTime()) {
-                    conditionSucceeded = false
-                  }
-                }
-              } else if (conf.specificTrait) {
-                const owned = await statisticsService.getOwnedTokens(users.map(u => u.web3_public_key))
-                const matching = owned.map(async (o) => {
-                  const tokenId = o.token_id.toString().padStart(4, '0')
-                  const metadata = await this.getTokenMetadata(tokenId, false)
-                  let result = false
-                  if (conf.specificTrait.traitType) {
-                    const toCheck = metadata.metadata.attributes.filter(a => a.trait_type === conf.specificTrait.traitType)
-                    result = toCheck.length && toCheck[0].value === conf.specificTrait.traitValue
-                  } else if (conf.specificTrait.hasOwnProperty('count')) {
-                    result = metadata.metadata.attributes.length >= conf.specificTrait.count
-                  }
-                  return result ? o : undefined
-                })
-                let r = await Promise.all(matching)
-                r = r.filter(o => o !== undefined)
-                conditionSucceeded = r.length > 0
-              }
-            } 
+            let conditionSucceeded = this.checkCondition(conf, users)
             if (conditionSucceeded && !conf.disallowAll) {
               // console.log(`--> granting ${role.name} to ${member.displayName}`)
               await member.roles.add(role)  
@@ -234,10 +238,6 @@ export class DAOService extends BaseService {
         await this.handleGracePeriods()
         setTimeout(() => this.grantRoles(), 60000*5)        
       }
-      /*
-      guilds.roles.cache.find(role => role.name === "role name");
-      member.roles.add(role);
-      */
     } catch (err) {
       console.warn('cannot grant roles', err)
     }
@@ -388,9 +388,12 @@ export class DAOService extends BaseService {
     `).all()
   }
 
-  getAllPolls() {
+  getAllPolls(params:{withoutRepost:boolean}={withoutRepost: false}) {
     return this.db.prepare(`
-      SELECT * FROM polls ORDER BY until DESC
+      SELECT *
+      FROM polls
+      ${params.withoutRepost ? 'WHERE linked_poll_id IS NULL' : ''}
+      ORDER BY until DESC
     `).all()
   }
 
@@ -560,6 +563,10 @@ export class DAOService extends BaseService {
     if (poll.linked_poll_id !== null) {
       initialPoll = this.db.prepare(`SELECT * FROM polls WHERE id = @id`).get({id: poll.linked_poll_id})
     }
+    if (poll.revealed || initialPoll.revealed) {
+      console.log('poll already revealed')
+      return
+    }
     if (poll.allowed_emojis.indexOf(value) === -1) {
       console.log('not an allowed emoji')
       return
@@ -582,6 +589,7 @@ export class DAOService extends BaseService {
     } else {
       // check role vote web
       logger.info('checking role vote web')
+
     }
 
     this.db.prepare(`
@@ -974,6 +982,29 @@ export class DAOService extends BaseService {
       }
     }
     return rows
+  }
+
+  getTwitterUsersByUserIds(ids: string[]) {
+
+    const rows = this.db.prepare(`
+    select * from accounts a, twitter_accounts ta 
+    where a.twitter_user_id = ta.twitter_user_id 
+    and a.id in (@ids)
+    `).all({ids: ids.join(',')})
+    if (config.dao_requires_encryption_key) {
+      // TODO handle guild id
+      const key = this.encryptionKeys.values().next().value
+      for (const row of rows) {
+        row.discord_user_id = decrypt(row.discord_user_id, key)
+        row.twitter_user_id = decrypt(row.twitter_user_id, key)
+        row.twitter_created_at = decrypt(row.twitter_created_at, key)
+        row.twitter_name = decrypt(row.twitter_name, key)
+        row.twitter_username = decrypt(row.twitter_username, key)
+        row.access_token = decrypt(row.access_token, key)
+        row.refresh_token = decrypt(row.refresh_token, key)
+      }
+    }
+    return rows    
   }
 
   getTwitterUsersByDiscordUserId(id: string) {

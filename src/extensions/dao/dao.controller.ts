@@ -21,9 +21,12 @@ export class DAOController {
 
   @Get('polls')
   polls(): string {
-    const polls = this.daoService.getAllPolls()
+    const polls = this.daoService.getAllPolls({withoutRepost: true})
     polls.forEach(element => {
       element.allowed_emojis = element.allowed_emojis.split(" ")
+      if (element.revealed) {
+        element.results = this.daoService.getPollResults(element.id)
+      }
     });
     return polls;
   }

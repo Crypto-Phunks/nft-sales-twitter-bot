@@ -44,25 +44,38 @@
                 border-left: 2px solid #999;
                 color: #999
             }
+            .count {
+                font-size: 16px;
+            }
         </style>
 
         <script id="poll-template" type="x-tmpl-mustache">
             {{^datas.0}}No upcoming votes, check back later.{{/datas.0}}
             {{#datas}}
-            <div style="margin-bottom: 40px">
-                <h2 style="margin-top: 50px">Poll #{{ id }}</h2>
-                <p>{{ description }}</p>
-                <div>
-                    {{#formatDate}}{{ until }}{{/formatDate}} ({{until}} UTC)
-                    — <a href="https://discord.com/channels/{{ discord_guild_id }}/{{ discord_channel_id }}/{{ poll.discord_message_id }}">[discord link]</a>
+                <div style="margin-bottom: 40px">
+                    <h2 style="margin-top: 50px">Poll #{{ id }}</h2>
+                    <p>{{ description }}</p>
+                    <div>
+                        {{#formatDate}}{{ until }}{{/formatDate}} ({{until}} UTC)
+                        — <a href="https://discord.com/channels/{{ discord_guild_id }}/{{ discord_channel_id }}/{{ poll.discord_message_id }}">[discord link]</a>
+                    </div>
+                    {{^ended}}
+                        <div class="votes">
+                            Cast your vote: 
+                            {{#allowed_emojis}}
+                                <span class="emoji" data-poll-id="{{ id }}">{{.}}</span>
+                            {{/allowed_emojis}}                
+                        </div>
+                    {{/ended}}
+                    {{#ended}}
+                        <div class="votes">
+                            Poll results: 
+                            {{#results}}
+                                <span class="emoji">{{ vote_value }} <span class="count">{{ count }}</span></span>
+                            {{/results}}                
+                        </div>                
+                    {{/ended}}
                 </div>
-                <div class="votes">
-                    Cast your vote: 
-                    {{#allowed_emojis}}
-                        <span class="emoji" data-vote-id="{{ id }}">{{.}}</span>
-                    {{/allowed_emojis}}                
-                </div>
-            </div>
             {{/datas}}
         </script>        
         <script type="module">
@@ -83,6 +96,9 @@
                     }
                 })
                 const json = await polls.json()
+                json.forEach(poll => {
+                    poll.ended = new Date(poll.until) < new Date()
+                })
                 console.log(json)
                 const template = document.getElementById('poll-template').innerHTML;
                 const rendered = Mustache.render(template, {
@@ -100,23 +116,26 @@
                 result.innerHTML = rendered;
                 result.style.display = 'block'
                 $(".emoji").click(async function() {
-                    const voteId = $(this).data('vote-id')
-                    console.log('emoji clicked', voteId)
+                    const voteId = $(this).data('poll-id')
+                    console.log('emoji clicked', pollId)
+                    if (!pollId) {
+                        return
+                    }
                     if (!currentUser) {
                         await login((currentUser) => {
-                            vote($(this).text(), voteId)
+                            vote($(this).text(), pollId)
                         })
                         return
                     }
-                    vote($(this).text(), voteId)
+                    vote($(this).text(), pollId)
                 })
                 document.getElementById('loading').style.display = 'none'      
             }
 
-            async function vote(emoji, voteMessageId) {
-                console.log('vote()', emoji, voteMessageId, currentUser);
+            async function vote(emoji, pollId) {
+                console.log('vote()', emoji, pollId, currentUser);
 
-                const result = await fetch(`/dao/vote?voteMessageId=${voteMessageId}&emoji=${emoji}`, {
+                const result = await fetch(`/dao/vote?pollId=${pollId}&emoji=${emoji}`, {
                         method: 'POST',
                         headers: {
                             'Accept': 'application/json',
@@ -162,7 +181,7 @@
         <script src="/js/moment.min.js"></script>
     </head>
     <body>
-        <h1>Cryptophunk Open Polls</h1>
+        <h1>Cryptophunks governance</h1>
 
         <div id="loading">Loading...</div>
         <div id="result" style="margin-top: 10px; display:none;"></div>

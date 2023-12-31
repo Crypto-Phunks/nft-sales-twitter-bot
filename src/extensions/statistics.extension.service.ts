@@ -265,7 +265,7 @@ Amount:   ${'Ξ'+(Math.floor(r.amount*100)/100).toFixed(2)}`)
                 const daoService = this.moduleRef.get(DAOService);
                 const users = daoService.getUsersByDiscordUserId(discordUserId)
                 additionalWallets.push(...users.map(u => u.web3_public_key))
-              }          
+              }
             } else if (!lookupWallet.startsWith('0x')) {
               // try to find the matching wallet
               const address = await this.provider.resolveName(`${wallet}`);
