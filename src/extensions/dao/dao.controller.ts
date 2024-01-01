@@ -93,6 +93,7 @@ export class DAOController {
     };    
     const result = {
       accessToken: await this.jwtService.signAsync(payload),
+      wallet: request.wallet
     };
     return result;
   }

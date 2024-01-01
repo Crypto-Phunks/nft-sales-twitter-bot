@@ -6,6 +6,9 @@
         <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100;400;900&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
         
         <style>
+            #connected {
+                font-size: 12px;
+            }
             body {
                 font-family: "Roboto Mono";
                 background: #FEFBEB;
@@ -153,6 +156,10 @@
             window.onload = async () => {
                 if (localStorage.getItem('currentUser')) {
                     currentUser = JSON.parse(localStorage.getItem('currentUser'))
+                    $("#current-user").text(formatWallet(currentUser.wallet))
+                    // TODO validate
+                } else {
+                    $("#connected").hide()
                 }
                 setTimeout(() => load(), 500)
             }            
@@ -166,6 +173,11 @@
                     }
                 })
                 config = await config.json()
+                $("#signout").click(() => {
+                    currentUser = null
+                    localStorage.removeItem('currentUser')
+                    document.location.reload()
+                })
                 $("#connect-discord").click(() => {
                     login((currentUser) => {
                         document.location.href = `https://discord.com/api/oauth2/authorize?client_id=${config.discord.client_id}&redirect_uri=${config.discord.redirect_uri}&response_type=token&scope=identify`
@@ -312,6 +324,13 @@
                 }
             }
 
+            function formatWallet(wallet) {
+                if (wallet.substr(0, 2) === '0x') {
+                    return `${wallet.substr(0, 6)}...${wallet.substr(-4)}`
+                }
+                return wallet
+            }
+
             async function login(callback) {
                 const provider = new ethers.providers.Web3Provider(window.ethereum)
                 const wallet = await provider.send("eth_requestAccounts", [])
@@ -335,6 +354,8 @@
                 currentUser = response
                 localStorage.setItem('currentUser', JSON.stringify(currentUser))
                 console.log('currentUser', currentUser)
+                $("#connected").show()
+                $("#current-user").text(formatWallet(currentUser.wallet))
 
                 if (callback) {
                     callback(currentUser)
@@ -350,10 +371,17 @@
         <header>
             <h1><a href="/polls">Cryptophunks<br/>governance</a></h1>
             <nav>
-                Prove humanity: 
-                <a id="connect-discord">Discord</a>
-                &bullet;
-                <a id="connect-twitter">Twitter</a>
+                <div>
+                    Prove humanity: 
+                    <a id="connect-discord">Discord</a>
+                    &bullet;
+                    <a id="connect-twitter">Twitter</a>
+                </div>
+                <div style="text-align: right;">
+                    <div id="connected">
+                        Connected as <span id="current-user"></span> <a id="signout">[signout]</a>
+                    </div>
+                </div>
             </nav>
         </header>
         <div id="loading">Loading...</div>
