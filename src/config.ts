@@ -27,11 +27,17 @@ export const config = {
   dao_requires_encryption_key: false,
   dao_web_vote_requirements: [
     {
-      name: 'Owned 1 Phunk for 30 days',
-      roleId: '1190002144544305262',
+      name: 'Owning a Phunk for 30 days',
       minOwnedCount: 1,
-      minOwnedTime: 30, // in days
-    },   
+      minOwnedTime: 30 // in days
+    },
+    {
+      name: 'Having a bounded Twitter/X account aging 1 month [<a href="/twitter">bind your Twitter/X account here</a>]',
+      twitter: {
+        verified: true,
+        age: 60*60*24*30, // in seconds (1 month)
+      }
+    }
   ],
   dao_roles: [
     /*
@@ -86,6 +92,10 @@ export const config = {
     */
   ] as DAORoleConfigurationDto[],
   discord_empty_wallet_gifs: ['https://media.tenor.com/J3mNIbj6A4wAAAAd/empty-shelves-john-travolta.gif', 'https://media.tenor.com/NteLNqDJB2QAAAAd/out-of-stock-this-is-happening.gif'],
+  discord_connect: {
+    client_id: '1139547496033558561',
+    redirect_uri: 'http%3A%2F%2Flocalhost%3A3000%2Fpolls%2F%23discord',
+  },
   //
   // uncomment the 2 lines above to use local images instead of retrieving images from ipfs for each tweet
   use_local_images: true,
@@ -151,5 +161,5 @@ export const config = {
     new BlurIOSweepParser(), // must be the last blurio parsers
   ] as LogParser[],
   daoModuleListenAddress: 'localhost',
-  twitterAPIRedirectURL: `http://localhost:3000/twitter/`
+  twitterAPIRedirectURL: `http://localhost:3000/polls/`
 };

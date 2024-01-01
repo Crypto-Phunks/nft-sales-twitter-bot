@@ -15,11 +15,20 @@ export class UserUnknownError extends Error {
     }   
 }
 
-export class MissingRequirementError extends Error {
-    constructor(msg: string) {
-        super(msg);
+export class MissingRequirementsError extends Error {
+
+    requirements: Requirement[];
+
+    constructor(requirements: Requirement[]) {
+        super();
+        this.requirements = requirements;
 
         // Set the prototype explicitly.
-        Object.setPrototypeOf(this, MissingRequirementError.prototype);
+        Object.setPrototypeOf(this, MissingRequirementsError.prototype);
     }   
+}
+
+export interface Requirement {
+    name: string,
+    success: boolean
 }

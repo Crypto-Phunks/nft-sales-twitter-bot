@@ -3,9 +3,10 @@ import { BindTwitterRequestDto, BindWeb3RequestDto } from './models';
 import { DAOService } from './dao.extension.service';
 import { JwtService } from '@nestjs/jwt';
 import { Signature } from 'ethers';
-import { SignatureError } from './errors';
+import { MissingRequirementsError, SignatureError } from './errors';
 import { Wallet } from 'alchemy-sdk';
 import { AuthGuard } from './auth.guard';
+import { config } from '../../config';
 
 @Controller('dao')
 export class DAOController {
@@ -17,6 +18,13 @@ export class DAOController {
   @Get('status')
   status(): string {
     return 'ok';
+  }
+  
+  @Get('config')
+  config() {
+    return {
+      discord: config.discord_connect,
+    };
   }
 
   @Get('polls')
@@ -62,6 +70,8 @@ export class DAOController {
       await this.daoService.createPollVote('web', pollId, req.user.sub, emoji, req.ip)
     } catch (error: any) {
       console.log('error', error.message)
+      if (error instanceof MissingRequirementsError)
+        return {result: 'ko', requirements: error.requirements};
       return {result: 'ko', error: error.message};
     }
     return req.user;
@@ -74,8 +84,6 @@ export class DAOController {
     let user = this.daoService.getUserByWeb3Wallet(request.wallet)
     if (!user) {
       this.daoService.bindWeb3Account({
-        account: request.wallet,
-        signature: request.signature
       })
       user = this.daoService.getUserByWeb3Wallet(request.wallet)
     }
@@ -94,11 +102,12 @@ export class DAOController {
     return {url: result.url};
   }
 
+  @UseGuards(AuthGuard)
   @Post('bind/web3')
-  bind(@Body() request: BindWeb3RequestDto): any {
+  bind(@Request() req, @Body() request: BindWeb3RequestDto): any {
     console.log(request)
     try {
-      // TODO handle guildId
+      request.account = req.user.wallet
       this.daoService.bindWeb3Account(request)
     } catch (error) {
       console.log('error', error)

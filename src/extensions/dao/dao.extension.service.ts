@@ -10,7 +10,7 @@ import { config } from '../../config';
 import { PermissionFlagsBits, Routes } from 'discord-api-types/v9'
 import { ethers } from 'ethers';
 import { BindWeb3RequestDto, BindTwitterRequestDto, BindTwitterResultDto, DAORoleConfigurationDto } from './models';
-import { MissingRequirementError, SignatureError } from './errors';
+import { MissingRequirementsError, SignatureError } from './errors';
 import { catchError, firstValueFrom } from 'rxjs';
 import { AxiosError } from 'axios';
 import { StatisticsService } from '../statistics.extension.service';
@@ -194,6 +194,7 @@ export class DAOService extends BaseService {
       r = r.filter(o => o !== undefined)
       conditionSucceeded = r.length > 0
     }    
+    return conditionSucceeded
   }
 
   async grantRoles() {
@@ -290,7 +291,7 @@ export class DAOService extends BaseService {
     /*
     if (!request.discordUserId && !request.twitterUserId) {
       throw new SignatureError('no correlation id')
-    }
+    } 
     */
     if (request.twitterUserId) {
       const twitterDatas = this.currentTwitterAuthResponse.get(request.twitterState)
@@ -300,7 +301,7 @@ export class DAOService extends BaseService {
         throw new SignatureError('invalid twitter user id')
       }
     }
-    if (request.discordUserId) {
+    if (request.discordAccessToken) {
       const { data } = await firstValueFrom(this.http.get('https://discord.com/api/users/@me', {
         headers: {
           authorization: `Bearer ${request.discordAccessToken}`,
@@ -311,27 +312,12 @@ export class DAOService extends BaseService {
           throw 'An error happened!';
         }),
       ))
-      if (data.id != request.discordUserId) {
-        throw new SignatureError('invalid discord user id')
-      }
+      request.discordUserId = data.id
+      request.discordUsername = data.username
     }
 
-    this.checkWeb3Signature({wallet: request.account, signature: request.signature})
-    
-    // encrypt datas
-    if (config.dao_requires_encryption_key) {
-      // TODO handle guild id
-      const key = this.encryptionKeys.values().next().value
-      request.account = encrypt(request.account, key)
-      request.discordUsername = encrypt(request.discordUsername, key)
-      request.discordUserId = encrypt(request.discordUserId, key)
-    }
     if (!request.twitterUserId) {
       request.twitterUserId = null
-    }
-    if (!request.discordUserId) {
-      request.discordUserId = null
-      request.discordUsername = null
     }
 
     //console.log('request', request)
@@ -590,11 +576,15 @@ export class DAOService extends BaseService {
     } else {
       // check role vote web
       logger.info('checking role vote web')
+      const requirements = []
+      let missingRequirements = false
       for (const requirement of config.dao_web_vote_requirements) {
         const check = await this.checkCondition(requirement, [user])
-        if (!check) {
-          throw new MissingRequirementError(`You don't fullfil some requirements for this poll: ${requirement.name}`)
-        }
+        requirements.push({name: requirement.name, success: check})
+        if (!check) missingRequirements = true
+      }
+      if (missingRequirements) {
+        throw new MissingRequirementsError(requirements)
       }
     }
 
