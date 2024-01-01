@@ -36,7 +36,6 @@ export class DAOService extends BaseService {
   positionUpdate: any;
   currentBlock: number;
   currentTwitterAuthRequests: Map<string, any> = new Map<string, any>();
-  currentTwitterAuthResponse: Map<string, any> = new Map<string, any>();
   encryptionKeys: Map<string, string> = new Map<string,string>();
 
   constructor(
@@ -251,10 +250,6 @@ export class DAOService extends BaseService {
      this.currentTwitterAuthRequests.delete(request.state)
      const twitterDatas = await this.twitterClient.finalizeLogin(infos, request.code)
      twitterDatas.discordUserId = infos.discord_user_id
-     if (!twitterDatas.discordUserId) {
-       // it's a twitter only login, keep the response in memory for later
-       this.currentTwitterAuthResponse.set(request.state, twitterDatas)       
-     }
 
     // encrypt datas
     if (config.dao_requires_encryption_key) {
@@ -285,6 +280,13 @@ export class DAOService extends BaseService {
           access_token = excluded.access_token          
     `)
     stmt.run(twitterDatas)
+
+    this.db.prepare(`
+      UPDATE accounts SET twitter_user_id = @twitterUserId WHERE lower(web3_public_key) = @wallet
+    `).run({
+      twitterUserId: twitterDatas.id,
+      wallet: request.wallet.toLowerCase()
+    })
     return twitterDatas
   }
 
@@ -294,14 +296,6 @@ export class DAOService extends BaseService {
       throw new SignatureError('no correlation id')
     } 
     */
-    if (request.twitterUserId) {
-      const twitterDatas = this.currentTwitterAuthResponse.get(request.twitterState)
-      this.currentTwitterAuthResponse.delete(request.twitterState)
-      
-      if (twitterDatas.id != request.twitterUserId) {
-        throw new SignatureError('invalid twitter user id')
-      }
-    }
     if (request.discordAccessToken) {
       const { data } = await firstValueFrom(this.http.get('https://discord.com/api/users/@me', {
         headers: {
