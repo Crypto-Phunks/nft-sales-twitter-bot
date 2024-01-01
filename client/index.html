@@ -116,7 +116,7 @@
         </style>
 
         <script id="poll-template" type="x-tmpl-mustache">
-            {{^datas.0}}No upcoming votes, check back later.{{/datas.0}}
+            {{^datas.0}}<div style="margin-top: 50px;">No upcoming votes, check back later.</div>{{/datas.0}}
             {{#datas}}
                 <div style="margin-bottom: 40px">
                     <h2 style="margin-top: 50px">Poll #{{ id }}</h2>
@@ -306,6 +306,9 @@
                     content += '</ul>'
                     $("#popin-content").html(content)
                     $("#popin").show()
+                } else {
+                    $("#popin-content").html(`Your vote has been casted, thank you!`)
+                    $("#popin").show()                    
                 }
             }
 
