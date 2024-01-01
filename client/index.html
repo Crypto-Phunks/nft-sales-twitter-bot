@@ -275,7 +275,8 @@
                         method: 'POST',
                         headers: {
                             'Accept': 'application/json',
-                            'Content-Type': 'application/json'
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${currentUser.accessToken}`
                         },
                         body: JSON.stringify({ 
                             code: params.get('code'),
