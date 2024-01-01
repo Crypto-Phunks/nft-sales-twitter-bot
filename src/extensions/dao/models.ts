@@ -11,6 +11,7 @@ export interface BindWeb3RequestDto {
 export interface BindTwitterRequestDto {
     state:string;
     code:string;
+    wallet:string;
 }
 
 export interface BindTwitterResultDto {

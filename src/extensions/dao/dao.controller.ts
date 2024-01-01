@@ -40,10 +40,12 @@ export class DAOController {
   }
 
   @Post('bind/twitter')
-  async bindTwitter(@Body() request: BindTwitterRequestDto):Promise<any> {
+  @UseGuards(AuthGuard)
+  async bindTwitter(@Request() req, @Body() request: BindTwitterRequestDto):Promise<any> {
     console.log(request)
     try {
       const result = {result: 'ok'}
+      request.wallet = req.user.wallet
       const infos = await this.daoService.bindTwitterAccount(request)
       result['twitterId'] = infos.id
       result['twitterUsername'] = infos.username
