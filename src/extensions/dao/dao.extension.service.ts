@@ -319,6 +319,12 @@ export class DAOService extends BaseService {
     if (!request.twitterUserId) {
       request.twitterUserId = null
     }
+    if (!request.discordUserId) {
+      request.discordUserId = null
+    }
+    if (!request.discordUsername) {
+      request.discordUsername = null
+    }
 
     //console.log('request', request)
 
