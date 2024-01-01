@@ -53,10 +53,10 @@ export class DAOService extends BaseService {
 
 
       if (config.dao_roles.length) {
-        setTimeout(() => this.rebindActivePolls(), 3000)
         setTimeout(() => this.grantRoles(), 10000)
-        setTimeout(() => this.handleEndedPolls(), 5000)
       }
+      setTimeout(() => this.rebindActivePolls(), 3000)
+      setTimeout(() => this.handleEndedPolls(), 5000)
     })
   }
 
