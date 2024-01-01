@@ -84,6 +84,7 @@ export class DAOController {
     let user = this.daoService.getUserByWeb3Wallet(request.wallet)
     if (!user) {
       this.daoService.bindWeb3Account({
+        account: request.wallet
       })
       user = this.daoService.getUserByWeb3Wallet(request.wallet)
     }
