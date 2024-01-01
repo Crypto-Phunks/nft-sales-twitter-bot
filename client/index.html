@@ -325,6 +325,7 @@
             }
 
             function formatWallet(wallet) {
+                if (!wallet) return ''
                 if (wallet.substr(0, 2) === '0x') {
                     return `${wallet.substr(0, 6)}...${wallet.substr(-4)}`
                 }
