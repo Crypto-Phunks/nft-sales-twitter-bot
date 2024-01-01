@@ -158,6 +158,7 @@
                 if (localStorage.getItem('currentUser')) {
                     currentUser = JSON.parse(localStorage.getItem('currentUser'))
                     $("#current-user").text(formatWallet(currentUser.wallet))
+                    $("#current-user").show()
                     // TODO validate
                 } else {
                     $("#connected").hide()
@@ -315,7 +316,7 @@
                 if (response.result === 'ko' && response.hasOwnProperty('requirements')) {
                     let content = '<h2>Missing requirements</h2>'
                     content += '<p>You\'re missing the following requirements to vote:</p><ul>'
-                    content += response.requirements.map(requirement => `<li><span>${requirement.check ? '✅' : '❌'}</span><span class="requirement">${requirement.name}</span></li>`).join('')
+                    content += response.requirements.map(requirement => `<li><span>${requirement.success ? '✅' : '❌'}</span><span class="requirement">${requirement.name}</span></li>`).join('')
                     content += '</ul>'
                     $("#popin-content").html(content)
                     $("#popin").show()

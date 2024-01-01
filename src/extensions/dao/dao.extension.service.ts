@@ -152,6 +152,7 @@ export class DAOService extends BaseService {
     let conditionSucceeded = false
     if (conf.minOwnedCount) {
       const owned = await statisticsService.getOwnedTokens(users.map(u => u.web3_public_key))
+      console.log(owned)
       conditionSucceeded = owned.length >= conf.minOwnedCount
       if (conditionSucceeded && conf.minOwnedTime) {
         const maxOwnedTime = Math.max(...owned.map(o => o.owned_since))
