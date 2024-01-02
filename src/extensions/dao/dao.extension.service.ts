@@ -151,7 +151,6 @@ export class DAOService extends BaseService {
     let conditionSucceeded = false
     if (conf.minOwnedCount) {
       const owned = await statisticsService.getOwnedTokens(users.map(u => u.web3_public_key))
-      console.log(owned)
       conditionSucceeded = owned.length >= conf.minOwnedCount
       if (conditionSucceeded && conf.minOwnedTime) {
         const maxOwnedTime = Math.max(...owned.map(o => o.owned_since))
@@ -211,7 +210,7 @@ export class DAOService extends BaseService {
             const users = this.getUsersByDiscordUserId(member.id.toString()) ?? []
             //const twitterUsers = this.getTwitterUsersByDiscordUserId(member.id.toString()) ?? []
 
-            let conditionSucceeded = this.checkCondition(conf, users)
+            let conditionSucceeded = await this.checkCondition(conf, users)
             if (conditionSucceeded && !conf.disallowAll) {
               // console.log(`--> granting ${role.name} to ${member.displayName}`)
               await member.roles.add(role)  
