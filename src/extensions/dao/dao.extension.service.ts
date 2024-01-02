@@ -203,6 +203,10 @@ export class DAOService extends BaseService {
         for (let conf of config.dao_roles) {
           const guild = await this.discordClient.getClient().guilds.fetch(conf.guildId)
           const role = await guild.roles.fetch(conf.roleId)
+          if (!role) {
+            logger.warn(`cannot find role ${conf.roleId} in guild ${guild.name} #${conf.guildId}`)
+            continue
+          }
           const members = await guild.members.fetch({ force: true })
           for (const m of members) {
             const member = m[1]
@@ -652,7 +656,7 @@ export class DAOService extends BaseService {
     const createPoll = new SlashCommandBuilder()
       .setName('createpoll')
       .setDescription('Create a new poll')
-      .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+      .setDefaultMemberPermissions(process.env.DAO_DO_NO_REQUEST_ADMIN === 'true' ? null : PermissionFlagsBits.Administrator)
       .addStringOption(option => option.setName('description')
         .setDescription('The message displayed to other users')
         .setRequired(true))
@@ -675,7 +679,7 @@ export class DAOService extends BaseService {
       const repostPoll = new SlashCommandBuilder()
         .setName('repostpoll')
         .setDescription('Repost an existing poll into another discord server')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+        .setDefaultMemberPermissions(process.env.DAO_DO_NO_REQUEST_ADMIN === 'true' ? null : PermissionFlagsBits.Administrator)
         .addIntegerOption(option => option.setName('pollid')
           .setDescription('The initial poll ID')
           .setRequired(true))        
@@ -689,7 +693,7 @@ export class DAOService extends BaseService {
       const pollResults = new SlashCommandBuilder()
         .setName('pollresults')
         .setDescription('Get poll results')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+        .setDefaultMemberPermissions(process.env.DAO_DO_NO_REQUEST_ADMIN === 'true' ? null : PermissionFlagsBits.Administrator)
         .addStringOption(option => option.setName('id')
           .setDescription('The poll ID')
           .setRequired(true))
@@ -697,7 +701,7 @@ export class DAOService extends BaseService {
       const closePoll = new SlashCommandBuilder()
         .setName('closepoll')
         .setDescription('Close poll')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+        .setDefaultMemberPermissions(process.env.DAO_DO_NO_REQUEST_ADMIN === 'true' ? null : PermissionFlagsBits.Administrator)
         .addStringOption(option => option.setName('id')
           .setDescription('The poll ID')
           .setRequired(true))          
@@ -705,7 +709,7 @@ export class DAOService extends BaseService {
       const deletePoll = new SlashCommandBuilder()
         .setName('deletepoll')
         .setDescription('Delete poll')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+        .setDefaultMemberPermissions(process.env.DAO_DO_NO_REQUEST_ADMIN === 'true' ? null : PermissionFlagsBits.Administrator)
         .addStringOption(option => option.setName('id')
           .setDescription('The poll ID')
           .setRequired(true))          
@@ -784,9 +788,11 @@ export class DAOService extends BaseService {
           for (let i=0; i < emojis.length; i+=2) { 
             await message.react(emojis[i])
           }
-          this.bindReactionCollector(message)
 
           this.createPoll(interaction.guildId, interaction.channelId, message.id, roleRequired, description, until, allowedEmojis, minimumVotesRequired, link, voteId)
+
+          this.bindReactionCollector(message)
+
           interaction.editReply(`**Vote ID #${poll.id} (cross-posted)**`)
         } else if ('listpolls' === interaction.commandName) {
           await interaction.deferReply({ephemeral: true})
