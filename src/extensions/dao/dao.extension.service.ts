@@ -411,7 +411,7 @@ export class DAOService extends BaseService {
     `).get({id})
   }
 
-  async closePoll(messageId:string) {
+  async closePoll(messageId:string, triggerReveal:boolean=false) {
     const poll = this.getPoll(messageId)
     if (!poll) return
     this.db.prepare(`UPDATE polls SET until = DATETIME('now', '-5 minutes')
@@ -420,8 +420,9 @@ export class DAOService extends BaseService {
 
     const linkedPolls = this.getAllLinkedPolls(poll.id)
     for (const linkedPoll of linkedPolls) {
-      this.deletePoll(linkedPoll.discord_message_id)
-    }      
+      this.closePoll(linkedPoll.discord_message_id)
+    }
+    this.handleEndedPolls()
   }
 
   async deletePoll(messageId:string, linked:boolean = false) {
@@ -807,7 +808,7 @@ export class DAOService extends BaseService {
         } else if ('closepoll' === interaction.commandName) {
           await interaction.deferReply()
           const messageId = interaction.options.get('id')?.value as string
-          this.closePoll(messageId)
+          this.closePoll(messageId, true)
           const response = `Poll closed.`
           this.handleEndedPolls()
           interaction.editReply(response)
