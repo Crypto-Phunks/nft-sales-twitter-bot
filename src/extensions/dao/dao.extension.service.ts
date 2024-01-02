@@ -413,6 +413,7 @@ export class DAOService extends BaseService {
 
   async closePoll(messageId:string) {
     const poll = this.getPoll(messageId)
+    if (!poll) return
     this.db.prepare(`UPDATE polls SET until = DATETIME('now', '-5 minutes')
       WHERE discord_message_id = @messageId`)
       .run({messageId: messageId})
@@ -425,6 +426,7 @@ export class DAOService extends BaseService {
 
   async deletePoll(messageId:string, linked:boolean = false) {
     const poll = this.getPoll(messageId)
+    if (!poll) return
     if (poll === undefined) {
       logger.warn(`cannot find poll for message id ${messageId}`)
       return
@@ -952,6 +954,10 @@ export class DAOService extends BaseService {
       if (user.length === 0) {
         logger.warn("cannot find user for reaction", discordUser.id)
         return
+      }
+      if (poll === undefined) {
+        logger.warn("the poll is undefined for", message.id)
+        return 
       }
       await this.createPollVote(message.guildId, poll.id, user[0].id, reaction.emoji.name)
       await reaction.users.remove(discordUser)
