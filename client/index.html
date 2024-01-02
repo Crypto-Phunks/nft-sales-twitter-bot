@@ -157,8 +157,21 @@
             window.onload = async () => {
                 if (localStorage.getItem('currentUser')) {
                     currentUser = JSON.parse(localStorage.getItem('currentUser'))
-                    $("#current-user").text(formatWallet(currentUser.wallet))
-                    $("#connected").show()
+                    const response = await fetch('/dao/profile', {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${currentUser.accessToken}`
+                        },
+                    })        
+                    const json = await response.json()
+                    if (json.wallet) {               
+                        $("#current-user").text(formatWallet(currentUser.wallet))
+                        $("#connected").show()
+                    } else {
+                        localStorage.removeItem('currentUser')
+                    }
                     // TODO validate
                 } else {
                     $("#connected").hide()
@@ -367,8 +380,8 @@
             }
         </script>        
         <script src="/js/jquery-3.7.1.min.js"></script>
-        <script src="/js/ethers-5.2.umd.min.js" type="application/javascript"></script>
-        <script src="/js/mustache.min.js" type="application/javascript"></script>
+        <script src="/js/ethers-5.2.umd.min.js" type="module"></script>
+        <script src="/js/mustache.min.js" type="module"></script>
         <script src="/js/moment.min.js"></script>
     </head>
     <body>
