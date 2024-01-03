@@ -47,7 +47,7 @@ export const providers:Provider[] = [
     })],
     providers,
     controllers: [
-      // DAOController
+      DAOController
     ],
 
 })
