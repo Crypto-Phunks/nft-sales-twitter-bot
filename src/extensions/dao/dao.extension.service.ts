@@ -333,9 +333,11 @@ export class DAOService extends BaseService {
       //console.log(row)
       const guild = await this.discordClient.getClient().guilds.fetch(row.discord_guild_id)
       const member = await guild.members.cache.get(row.discord_user_id)
-      const role = await guild.roles.cache.get(row.discord_role_id)
-      member.roles.remove(role)
-      this.removeGracePeriod(row.discord_guild_id, row.discord_user_id, row.discord_role_id)
+      if (member && member.roles) {
+        const role = await guild.roles.cache.get(row.discord_role_id)
+        member.roles.remove(role)
+        this.removeGracePeriod(row.discord_guild_id, row.discord_user_id, row.discord_role_id)
+      }
     }
     // logger.info('cleaned grace periods')
   }
