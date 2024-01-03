@@ -17,13 +17,14 @@ export const config = {
   // Contract Address ======================================== //
   arcade_api_key: '4C77emHoAhekTX2Tf9DMHIRhTn39E2zKQDGTyV1ExWRaNzslW',
   contract_address: '0xf07468ead8cf26c752c676e43c814fee9c8cf402',
+  ethscription_root_tx: '0x5cfc96c2b7a9f2bd52252a5f292eec084adcdfebf6e0561294257b583c3affa2',
   nftx_vault_contract_address: '0xB39185e33E8c28e0BB3DbBCe24DA5dEA6379Ae91',
   // Enter the block where your contract has been created
   statistic_initial_block: 18035326,
   //
-  discord_channels: '1084590983506841651,1190428538625593405',
-  discord_client_id: '1190427242128478310',
-  discord_guild_ids: '840362318033846333,873564453227094078',
+  discord_channels: '919681244537716767,968448656221011981',
+  discord_client_id: '1139547496033558561',
+  discord_guild_ids: '880485569652740136,968448656221011978',
   dao_requires_encryption_key: false,
   dao_web_vote_requirements: [
     {
@@ -32,7 +33,7 @@ export const config = {
       minOwnedTime: 30 // in days
     },
     {
-      name: 'Having a bounded Twitter/X account aging 1 month [<a href="/twitter">bind your Twitter/X account here</a>]',
+      name: 'Having a bounded Twitter/X account aging 1 month',
       twitter: {
         verified: true,
         age: 60*60*24*30, // in seconds (1 month)
@@ -40,28 +41,11 @@ export const config = {
     }
   ],
   dao_roles: [
-
-    {
-      guildId: '873564453227094078',
-      roleId: '1191842997122383892',
-      gracePeriod: 60*60*24, // in seconds (1 day)
-      minOwnedCount: 1,
-      minOwnedTime: 30, // in days
-      disallowAll: false,
-    },
-    {
-      guildId: '840362318033846333',
-      roleId: '1190793074079703132',
-      gracePeriod: 60*60*24, // in seconds (1 day)
-      minOwnedCount: 1,
-      minOwnedTime: 30, // in days
-      disallowAll: false,
-    },
   ] as DAORoleConfigurationDto[],
   discord_empty_wallet_gifs: ['https://media.tenor.com/J3mNIbj6A4wAAAAd/empty-shelves-john-travolta.gif', 'https://media.tenor.com/NteLNqDJB2QAAAAd/out-of-stock-this-is-happening.gif'],
   discord_connect: {
     client_id: '1139547496033558561',
-    redirect_uri: 'https%3A%2F%2Ftest-phunkbot.crabdance.com%2F%23discord',
+    redirect_uri: 'http%3A%2F%2Flocalhost%3A3000%2Fpolls%2F%23discord',
   },
   //
   // uncomment the 2 lines above to use local images instead of retrieving images from ipfs for each tweet
@@ -70,7 +54,7 @@ export const config = {
   use_forced_remote_image_path: false,
   forced_remote_image_path: 'https://cryptopunks.app/public/images/cryptopunks/punk<tokenId>.png',
   enable_flashbot_detection: true,
-  //
+  // 
   // this is a configuration for the phunk bid demo extension
   local_bids_image_path: './bids_images/Phunk_',
   discord_owned_tokens_image_path: 'http://70.34.216.182/token_images/phunk<tokenId>.png',
@@ -112,7 +96,7 @@ export const config = {
   // Available Options: ====================================== //
   // true, false ============================================= //
   includeFreeMint: false,
-  gifModuleMentionnedUserId: 1540024208255754241,
+  gifModuleMentionnedUserId: 1540024208255754241, 
   parsers: [
     new OpenSeaWyvernParser(),
     new OpenSeaSeaportParser(),
@@ -127,6 +111,6 @@ export const config = {
     new BlurIOSalesParser(),
     new BlurIOSweepParser(), // must be the last blurio parsers
   ] as LogParser[],
-  daoModuleListenAddress: '0.0.0.0',
-  twitterAPIRedirectURL: `https://test-phunkbot.crabdance.com/`
+  daoModuleListenAddress: 'localhost',
+  twitterAPIRedirectURL: `http://localhost:3000/polls/`
 };

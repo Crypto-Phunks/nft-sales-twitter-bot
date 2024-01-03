@@ -1,23 +1,25 @@
-import { Module } from '@nestjs/common';
+import { Module, Provider } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 
 import { Erc721SalesService } from './erc721sales.service';
 // import { PhunksBidService } from './extensions/phunks.bid.extension.service';
 // import { PhunksAuctionHouseService } from './extensions/phunks.auction.house.extension.service';
-import { PhunksAuctionFlywheelService } from './extensions/phunks.auction.flywheel.extension.service';
+// import { PhunksAuctionFlywheelService } from './extensions/phunks.auction.flywheel.extension.service';
 import { StatisticsService } from './extensions/statistics.extension.service';
-import { PhunksBidService } from './extensions/phunks.bid.extension.service';
-import { PhunksAuctionHouseService } from './extensions/phunks.auction.house.extension.service';
-import { PhunksErc721SpecialisedSalesService } from './extensions/phunks.erc721.specialised.service/phunks.erc721.specialised.service';
+// import { PhunksBidService } from './extensions/phunks.bid.extension.service';
+// import { PhunksAuctionHouseService } from './extensions/phunks.auction.house.extension.service';
+// import { PhunksErc721SpecialisedSalesService } from './extensions/phunks.erc721.specialised.service/phunks.erc721.specialised.service';
 import { PhunksGifTwitterService } from './extensions/phunks.gif.twitter.extension.service';
 import { DAOService } from './extensions/dao/dao.extension.service';
 import { DAOController } from './extensions/dao/dao.controller';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { JwtModule } from '@nestjs/jwt';
+import { EthscriptionsSalesService } from './ethscriptions.sales.service';
 
-export const providers = [
+export const providers:Provider[] = [
   Erc721SalesService,
+  //EthscriptionsSalesService,
   //PhunksErc721SpecialisedSalesService,
   ////
   // Below is a simple example of how to create and plug a custom 
@@ -45,7 +47,7 @@ export const providers = [
     })],
     providers,
     controllers: [
-      DAOController
+      // DAOController
     ],
 
 })
