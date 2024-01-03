@@ -884,9 +884,10 @@ export class DAOService extends BaseService {
           for (let i=0; i < emojis.length; i+=2) { 
             await message.react(emojis[i])
           }
+
+          const voteId = this.createPoll(interaction.guildId, interaction.channelId, message.id, roleRequired, description, until, allowedEmojis, minimumVotesRequired, link)          
           this.bindReactionCollector(message)
 
-          const voteId = this.createPoll(interaction.guildId, interaction.channelId, message.id, roleRequired, description, until, allowedEmojis, minimumVotesRequired, link)
           interaction.editReply(`**Vote ID #${voteId}**`)
         } else if ('bounded' === interaction.commandName) {
           await interaction.deferReply({ephemeral: true})
@@ -953,7 +954,7 @@ export class DAOService extends BaseService {
   }
   
   bindReactionCollector(message: Message) {
-    console.log(`bindReactionCollector ${message}`)
+    console.log(`bindReactionCollector ${message.id}`)
     let collector = message.createReactionCollector({});
     const poll = this.getPollByDiscordMessageId(message.id)
 
