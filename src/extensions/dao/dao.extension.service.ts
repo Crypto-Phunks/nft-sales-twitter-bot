@@ -508,7 +508,7 @@ export class DAOService extends BaseService {
   getPollResults(voteId: any) {
     const votesStmt = this.db.prepare(`
         SELECT vote_value, count(*) as count FROM poll_votes
-        WHERE poll_id = @voteId or poll_id in (SELECT id FROM polls WHERE linked_poll_id = @voteId)
+        WHERE poll_id = @voteId or poll_id in (SELECT linked_poll_id FROM polls WHERE id = @voteId)
         group by 1
       `)  
     return votesStmt.all({voteId})
