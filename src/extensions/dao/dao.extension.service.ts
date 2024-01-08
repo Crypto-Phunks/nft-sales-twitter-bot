@@ -647,6 +647,8 @@ export class DAOService extends BaseService {
     await message.edit({
       embeds: [embed]
     })
+
+    // TODO should update linked polls too
   }
 
   async registerCommands() {
