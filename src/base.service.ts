@@ -203,6 +203,7 @@ export class BaseService {
 
   async dispatch(data: TweetRequest) {
     const tweet = process.env.DISABLE_TWEETS === 'true' ? {id:'-1'} : await this.tweet(data)
+    if (process.env.DISABLE_DISCORD === 'true') return
     await this.discord(data, tweet.id)
   }
   

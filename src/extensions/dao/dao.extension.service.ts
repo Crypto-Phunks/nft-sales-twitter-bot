@@ -62,10 +62,14 @@ export class DAOService extends BaseService {
   async rebindActivePolls() {
     const polls = this.getActivePolls()
     for (const poll of polls) {
-      const channel = await this.discordClient.getClient().channels.fetch(poll.discord_channel_id.toString()) as TextChannel;
-      console.log(`fetched ${poll.discord_channel_id} as ${channel}`)
-      const voteMessage = await channel.messages.fetch(poll.discord_message_id)
-      this.bindReactionCollector(voteMessage)
+      try {
+        const channel = await this.discordClient.getClient().channels.fetch(poll.discord_channel_id.toString()) as TextChannel;
+        console.log(`fetched ${poll.discord_channel_id} as ${channel}`)
+        const voteMessage = await channel.messages.fetch(poll.discord_message_id)
+        this.bindReactionCollector(voteMessage)
+      } catch (error) {
+        console.log(`cannot rebind ${poll.discord_channel_id}, continuing`)
+      }
     }
   }
 
@@ -596,13 +600,13 @@ export class DAOService extends BaseService {
         throw new MissingRequirementsError(requirements)
       }
     }
-
+    
     this.db.prepare(`
       DELETE FROM poll_votes WHERE 
       poll_id = @voteId AND
-      user_id = @userId
+      user_id IN (SELECT id FROM accounts WHERE discord_user_id = @discordUserId OR twitter_user_id = @twitterUserId)
     `).run({
-      voteId: initialPoll.id, userId
+      voteId: initialPoll.id, discordUserId: user.discord_user_id, twitterUserId: user.twitter_user_id
     })
     const stmt = this.db.prepare(`
       INSERT INTO poll_votes (poll_id, user_id, vote_value, voted_at, vote_origin, ip_address)

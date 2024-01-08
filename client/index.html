@@ -6,6 +6,10 @@
         <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100;400;900&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
         
         <style>
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
+            }
             #connected {
                 font-size: 12px;
                 display: none;
@@ -14,7 +18,7 @@
                 font-family: "Roboto Mono";
                 background: #FEFBEB;
                 color: #222;
-                padding: 20px 40px;
+                padding: 10px 40px;
             }
             #loading {
                 margin-top: 50px;
@@ -50,18 +54,19 @@
             h1 {
                 cursor: pointer;
                 font-family: "Retro Computer";
-                font-size: 16px;
-                line-height: 19px;
+                font-size: 14px;
+                font-weight: normal;
+                line-height: 14px;
                 margin-left: 75px;
                 position: relative;
             }
             h1:before {
                 content: "";
                 position: absolute;
-                width: 60px;
-                height: 60px;
+                width: 62px;
+                height: 62px;
                 left: -75px;
-                top: 10px;
+                top: 5px;
                 image-rendering: pixelated;                
                 background-image: url(/images/glasses.png);
                 background-repeat: no-repeat;
@@ -385,29 +390,33 @@
         <script src="/js/moment.min.js"></script>
     </head>
     <body>
-        <header>
-            <h1><a href="/">Cryptophunks<br/>governance</a></h1>
-            <nav>
-                <div>
-                    Prove humanity: 
-                    <a id="connect-discord">Discord</a>
-                    &bullet;
-                    <a id="connect-twitter">Twitter</a>
-                </div>
-                <div style="text-align: right;">
-                    <div id="connected">
-                        Connected as <span id="current-user"></span> <a id="signout">[signout]</a>
+        <div class="container">
+            <header>
+                <h1>
+                    <a href="/">Cryptophunks<br/>governance</a>
+                </h1>
+                <nav>
+                    <div>
+                        Prove humanity: 
+                        <a id="connect-discord">Discord</a>
+                        &bullet;
+                        <a id="connect-twitter">Twitter</a>
                     </div>
-                </div>
-            </nav>
-        </header>
-        <div id="loading">Loading...</div>
-        <div id="result" style="margin-top: 10px; display:none;"></div>
+                    <div style="text-align: right;">
+                        <div id="connected">
+                            Connected as <span id="current-user"></span> <a id="signout">[signout]</a>
+                        </div>
+                    </div>
+                </nav>
+            </header>
+            <div id="loading">Loading...</div>
+            <div id="result" style="margin-top: 10px; display:none;"></div>
 
-        <div id="popin">
-            <div id="popin-backdrop"></div>
-            <div id="popin-content">
-                
+            <div id="popin">
+                <div id="popin-backdrop"></div>
+                <div id="popin-content">
+                    
+                </div>
             </div>
         </div>
     </body>
