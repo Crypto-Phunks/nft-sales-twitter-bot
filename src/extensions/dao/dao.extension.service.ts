@@ -421,39 +421,39 @@ export class DAOService extends BaseService {
     `).get({id})
   }
 
-  async closePoll(messageId:string, triggerReveal:boolean=false) {
-    const poll = this.getPoll(messageId)
+  async closePoll(pollId:string, guildId:string, triggerReveal:boolean=false) {
+    const poll = this.getPollById(pollId)
     if (!poll) return
     this.db.prepare(`UPDATE polls SET until = DATETIME('now', '-5 minutes')
-      WHERE discord_message_id = @messageId`)
-      .run({messageId: messageId})
+      WHERE id = @pollId AND discord_guild_id = @guildId`)
+      .run({pollId, guildId})
 
     const linkedPolls = this.getAllLinkedPolls(poll.id)
     for (const linkedPoll of linkedPolls) {
-      this.closePoll(linkedPoll.discord_message_id)
+      this.closePoll(linkedPoll.id, linkedPoll.discord_guild_id)
     }
     this.handleEndedPolls()
   }
 
-  async deletePoll(messageId:string, linked:boolean = false) {
-    const poll = this.getPoll(messageId)
+  async deletePoll(pollId:string, guildId:string, linked:boolean = false) {
+    const poll = this.getPollById(pollId)
     if (!poll) return
     if (poll === undefined) {
-      logger.warn(`cannot find poll for message id ${messageId}`)
+      logger.warn(`cannot find poll for poll id ${pollId}`)
       return
     }
     this.db.prepare(`DELETE FROM polls
-      WHERE discord_message_id = @messageId`)
-      .run({messageId: messageId})
+      WHERE id = @pollId and discord_guild_id = @guildId`)
+      .run({pollId, guildId})
     const channel = await this.discordClient.getClient().channels.cache.get(poll.discord_channel_id) as TextChannel;      
-    const voteMessage = await channel.messages.fetch(messageId)
+    const voteMessage = await channel.messages.fetch(poll.discord_message_id)
     const message = linked ? `Root poll has been deleted.` : `Poll deleted.`
-    await voteMessage.edit(message)
+    await voteMessage.edit({content: message, embeds: []})
     await voteMessage.reactions.removeAll()
 
     const linkedPolls = this.getAllLinkedPolls(poll.id)
     for (const linkedPoll of linkedPolls) {
-      this.deletePoll(linkedPoll.discord_message_id, true)
+      this.deletePoll(linkedPoll.id, linkedPoll.discord_guild_id, true)
     }
   }
 
@@ -470,12 +470,12 @@ export class DAOService extends BaseService {
       }
   
       //console.log(row)
-      const votes = this.getPollResults(initialPoll.discord_message_id)
+      const votes = this.getPollResults(initialPoll.id)
       let message = `${poll.description}\n\nResults @everyone:\n———\n`
       votes.forEach(vote => {
         message += `${vote.vote_value}\t${vote.count}\n———\n`
       });
-      message += `Poll ID: ${poll.discord_message_id}\n`
+      message += `Poll ID: ${poll.id}\n`
       if (poll.minimum_votes_required > 0) {
         message += `Minimum votes required was: ${poll.minimum_votes_required}\n`
       }
@@ -821,15 +821,15 @@ export class DAOService extends BaseService {
           interaction.editReply(response)
         } else if ('closepoll' === interaction.commandName) {
           await interaction.deferReply()
-          const messageId = interaction.options.get('id')?.value as string
-          this.closePoll(messageId, true)
+          const pollId = interaction.options.get('id')?.value as string
+          this.closePoll(pollId, interaction.guildId, true)
           const response = `Poll closed.`
           this.handleEndedPolls()
           interaction.editReply(response)
         } else if ('deletepoll' === interaction.commandName) {
           await interaction.deferReply()
           const messageId = interaction.options.get('id')?.value as string
-          this.deletePoll(messageId)
+          this.deletePoll(messageId, interaction.guildId)
           const response = `Poll deleted.`
           this.handleEndedPolls()
           interaction.editReply(response)          
