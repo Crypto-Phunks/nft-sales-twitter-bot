@@ -962,7 +962,17 @@ export class DAOService extends BaseService {
   bindReactionCollector(message: Message) {
     console.log(`bindReactionCollector ${message.id}`)
     let collector = message.createReactionCollector({});
+
     const poll = this.getPollByDiscordMessageId(message.id)
+
+    message.reactions.removeAll()
+
+    const allowedEmojis = poll.allowed_emojis as string
+    const emojis = Array.from(allowedEmojis)
+
+    for (let i=0; i < emojis.length; i+=2) { 
+      message.react(emojis[i])
+    }
 
     collector.on('collect', async (reaction, discordUser) => {
       //console.log('reaction added', reaction, user);
