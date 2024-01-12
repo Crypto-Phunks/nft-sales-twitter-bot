@@ -464,42 +464,46 @@ export class DAOService extends BaseService {
     `)  
     const all = stmt.all()
     for (let poll of all) {
-      let initialPoll = poll
-      if (poll.linked_poll_id !== null) {
-        initialPoll = this.db.prepare(`SELECT * FROM polls WHERE id = @id`).get({id: poll.linked_poll_id})
-      }
-  
-      //console.log(row)
-      const votes = this.getPollResults(initialPoll.id)
-      let message = `${poll.description}\n\nResults @everyone:\n———\n`
-      votes.forEach(vote => {
-        message += `${vote.vote_value}\t${vote.count}\n———\n`
-      });
-      message += `Poll ID: ${poll.id}\n`
-      if (poll.minimum_votes_required > 0) {
-        message += `Minimum votes required was: ${poll.minimum_votes_required}\n`
-      }
-      
-      const channel = await this.discordClient.getClient().channels.cache.get(poll.discord_channel_id) as TextChannel;
-      if (!channel) {
-        logger.warn(`cannot find channel for ended vote: ${poll.discord_channel_id}`)
-        continue
-      }
-      const titleText = `⏰ • Vote ended`
-      const title = `${titleText} ${poll.link ?? ''}` 
+      try {
+        let initialPoll = poll
+        if (poll.linked_poll_id !== null) {
+          initialPoll = this.db.prepare(`SELECT * FROM polls WHERE id = @id`).get({id: poll.linked_poll_id})
+        }
+    
+        //console.log(row)
+        const votes = this.getPollResults(initialPoll.id)
+        let message = `${poll.description}\n\nResults @everyone:\n———\n`
+        votes.forEach(vote => {
+          message += `${vote.vote_value}\t${vote.count}\n———\n`
+        });
+        message += `Poll ID: ${poll.id}\n`
+        if (poll.minimum_votes_required > 0) {
+          message += `Minimum votes required was: ${poll.minimum_votes_required}\n`
+        }
+        
+        const channel = await this.discordClient.getClient().channels.cache.get(poll.discord_channel_id) as TextChannel;
+        if (!channel) {
+          logger.warn(`cannot find channel for ended vote: ${poll.discord_channel_id}`)
+          continue
+        }
+        const titleText = `⏰ • Vote ended`
+        const title = `${titleText} ${poll.link ?? ''}` 
 
-      const embed = new MessageEmbed()
-        .setColor('#CCCCCC' as HexColorString)
-        .setTitle(title)
-        .setDescription(message)
-        .setTimestamp();   
-              
-      const voteMessage = await channel.messages.fetch(poll.discord_message_id)
-      await voteMessage.edit({
-        embeds: [embed]
-      })
-      await voteMessage.reactions.removeAll()
-      this.db.prepare(`UPDATE polls SET revealed = TRUE WHERE discord_message_id = @messageId`).run({messageId: poll.discord_message_id})
+        const embed = new MessageEmbed()
+          .setColor('#CCCCCC' as HexColorString)
+          .setTitle(title)
+          .setDescription(message)
+          .setTimestamp();   
+                
+        const voteMessage = await channel.messages.fetch(poll.discord_message_id)
+        await voteMessage.edit({
+          embeds: [embed]
+        })
+        await voteMessage.reactions.removeAll()
+        this.db.prepare(`UPDATE polls SET revealed = TRUE WHERE discord_message_id = @messageId`).run({messageId: poll.discord_message_id})
+      } catch (err) {
+        console.warn(err)
+      }
     }
     logger.info('cleaned end polls')
     setTimeout(() => this.handleEndedPolls(), 60000*10)
