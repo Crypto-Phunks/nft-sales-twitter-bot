@@ -574,7 +574,7 @@ export class DAOService extends BaseService {
 
     if (guildId !== 'web') {
       const guild = this.discordClient.getClient().guilds.cache.get(guildId)
-      const member = await guild.members.cache.get(user.discord_user_id)
+      const member = await guild.members.fetch(user.discord_user_id)
       if (member.user.bot) return
       // if (poll.discord_role_id && !member.roles.cache.has(poll.discord_role_id)) {    
       if (poll.discord_role_id && (member as any)._roles.indexOf(poll.discord_role_id) === -1) {
@@ -648,7 +648,19 @@ export class DAOService extends BaseService {
       embeds: [embed]
     })
 
-    // TODO should update linked polls too
+    // update linked polls too
+    const others = this.db.prepare(`
+      SELECT * FROM polls 
+      WHERE linked_poll_id = @voteId OR id = @voteId
+      ORDER BY until DESC
+    `).all({voteId})
+    for (const other of others) {
+      const channel = await this.discordClient.getClient().channels.cache.get(other.discord_channel_id) as TextChannel;
+      const message = await channel.messages.fetch(other.discord_message_id)
+      await message.edit({
+        embeds: [embed]
+      })
+    }
   }
 
   async registerCommands() {
@@ -959,16 +971,33 @@ export class DAOService extends BaseService {
     return embed
   }
   
-  bindReactionCollector(message: Message) {
+  async bindReactionCollector(message: Message) {
     console.log(`bindReactionCollector ${message.id}`)
     let collector = message.createReactionCollector({});
 
     const poll = this.getPollByDiscordMessageId(message.id)
 
-    message.reactions.removeAll()
-
     const allowedEmojis = poll.allowed_emojis as string
     const emojis = Array.from(allowedEmojis)
+
+    // add missing votes
+    for (let i=0; i < emojis.length; i+=2) { 
+      const reaction = message.reactions.cache.get(emojis[i])
+      if (!reaction) continue
+      const users = await reaction.users.fetch()  
+      console.log(users)
+      for (const user of users.values()) {
+        if (user.bot) continue
+        const daoUser = this.getUsersByDiscordUserId(user.id.toString())
+        if (daoUser.length) {
+          this.createPollVote(poll.discord_guild_id, poll.id, daoUser[0].id, emojis[i]);
+          await reaction.remove()
+        }
+      }
+    }
+
+    //message.reactions.removeAll()
+
 
     for (let i=0; i < emojis.length; i+=2) { 
       message.react(emojis[i])
