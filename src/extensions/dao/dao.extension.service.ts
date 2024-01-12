@@ -661,6 +661,7 @@ export class DAOService extends BaseService {
     for (const other of others) {
       const channel = await this.discordClient.getClient().channels.cache.get(other.discord_channel_id) as TextChannel;
       const message = await channel.messages.fetch(other.discord_message_id)
+      const embed = this.formatVoteMessage(poll.description, untilUTC, poll.link, other.discord_role_id, poll.minimum_votes_required, voteCount)
       await message.edit({
         embeds: [embed]
       })
