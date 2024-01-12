@@ -160,6 +160,12 @@
             let currentUser = null
 
             window.onload = async () => {
+                $(document).on('click', '.bindtwitter', () => {
+                    console.log('.bindtwitter')
+                    $("#connect-twitter").click()
+                    return false
+                })
+
                 if (localStorage.getItem('currentUser')) {
                     currentUser = JSON.parse(localStorage.getItem('currentUser'))
                     const response = await fetch('/dao/profile', {
