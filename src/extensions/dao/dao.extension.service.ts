@@ -655,7 +655,7 @@ export class DAOService extends BaseService {
     // update linked polls too
     const others = this.db.prepare(`
       SELECT * FROM polls 
-      WHERE linked_poll_id = @voteId OR id = @voteId
+      WHERE linked_poll_id = @voteId OR id = @voteId OR id IN (select linked_poll_id FROM polls where id = @voteId)
       ORDER BY until DESC
     `).all({voteId})
     for (const other of others) {
@@ -989,7 +989,7 @@ export class DAOService extends BaseService {
       const reaction = message.reactions.cache.get(emojis[i])
       if (!reaction) continue
       const users = await reaction.users.fetch()  
-      console.log(users)
+      //console.log(users)
       for (const user of users.values()) {
         if (user.bot) continue
         const daoUser = this.getUsersByDiscordUserId(user.id.toString())
