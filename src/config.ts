@@ -14,6 +14,10 @@ import { RaribleParser } from "./parsers/rarible.parser";
 import { X2Y2Parser } from "./parsers/x2y2.parser";
 
 export const config = {
+  // you can disable tweet delays by setting this to true
+  // delaying tweets improve flash bot detection because we have 
+  // more time to analyze the mempool
+  do_no_delay_tweets: true,
   // Contract Address ======================================== //
   arcade_api_key: '4C77emHoAhekTX2Tf9DMHIRhTn39E2zKQDGTyV1ExWRaNzslW',
   contract_address: '0xf07468ead8cf26c752c676e43c814fee9c8cf402',
@@ -21,9 +25,9 @@ export const config = {
   // Enter the block where your contract has been created
   statistic_initial_block: 18035326,
   //
-  discord_channels: '1084590983506841651,1190428538625593405',
-  discord_client_id: '1190427242128478310',
-  discord_guild_ids: '840362318033846333,873564453227094078',
+  discord_channels: '919681244537716767,968448656221011981',
+  discord_client_id: '1139547496033558561',
+  discord_guild_ids: '968448656221011978,880485569652740136',
   dao_requires_encryption_key: false,
   dao_web_vote_requirements: [
     {
@@ -32,7 +36,7 @@ export const config = {
       minOwnedTime: 30 // in days
     },
     {
-      name: 'Having a bounded Twitter/X account aging 1 month [<a href="/twitter">bind your Twitter/X account here</a>]',
+      name: 'Having a bounded Twitter/X account aging 1 month [<a class="bindtwitter" href="/">bind your Twitter/X account here</a>]',
       twitter: {
         verified: true,
         age: 60*60*24*30, // in seconds (1 month)

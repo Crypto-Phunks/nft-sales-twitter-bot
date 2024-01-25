@@ -876,7 +876,8 @@ export class DAOService extends BaseService {
             }
           });
           
-          interaction.followUp({ephemeral: true, content: response})
+          if (response.length > 0)
+            interaction.followUp({ephemeral: true, content: response})
 
         } else if ('createpoll' === interaction.commandName) {
           await interaction.deferReply()

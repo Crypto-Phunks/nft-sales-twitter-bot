@@ -202,9 +202,17 @@ export class BaseService {
   }
 
   async dispatch(data: TweetRequest) {
-    const tweet = process.env.DISABLE_TWEETS === 'true' ? {id:'-1'} : await this.tweet(data)
+    let tweetId = '-1'
+    if (process.env.DISABLE_TWEETS !== 'true') {
+      try {
+        const tweet = await this.tweet(data)
+        tweetId = tweet.id
+      } catch (error) {
+        logger.error(`error while tweeting ${error}`, error)
+      }
+    }
     if (process.env.DISABLE_DISCORD === 'true') return
-    await this.discord(data, tweet.id)
+    await this.discord(data, tweetId)
   }
   
   async discord(data: TweetRequest, 
