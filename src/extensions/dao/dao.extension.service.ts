@@ -23,6 +23,7 @@ import { decrypt, encrypt } from './crypto';
 import { de } from 'date-fns/locale';
 import { utcToZonedTime } from 'date-fns-tz';
 import { get } from 'http';
+import { stat } from 'fs';
 
 const logger = createLogger('dao.extension.service')
 
@@ -949,7 +950,15 @@ Vote: ${v.vote_value} (${v.voted_at})
           if (users.length) {
             response += `\n———\n\nCurrently bound web3 wallet(s): \n`
             response += '```fix\n'
-            for (const u of users) response += `${u.web3_public_key} \n`
+            for (const u of users) {
+              response += `${u.web3_public_key} `
+              if (providers.indexOf(StatisticsService) >= 0) {
+                const statisticsService = this.moduleRef.get(StatisticsService);   
+                const owned = statisticsService.getOwnedTokens([u.web3_public_key])
+                response += `owning ${owned.length} token(s)`  
+              }
+              response += `\n`
+            }
             response += '```\n———\n\n'
           } else {
             response += `No web3 wallet bounded yet. Run /bindweb3 command. \n\n———\n`
