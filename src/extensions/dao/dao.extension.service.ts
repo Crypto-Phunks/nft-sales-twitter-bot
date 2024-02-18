@@ -23,6 +23,7 @@ import { decrypt, encrypt } from './crypto';
 import { de } from 'date-fns/locale';
 import { utcToZonedTime } from 'date-fns-tz';
 import { get } from 'http';
+import { stat } from 'fs';
 
 const logger = createLogger('dao.extension.service')
 
@@ -747,6 +748,10 @@ export class DAOService extends BaseService {
       .setName('bounded')
       .setDescription('Show the web3 wallets and social accounts bounded to your discord account')
 
+    const history = new SlashCommandBuilder()
+      .setName('history')
+      .setDescription('Show the vote history of your account')
+
     const commands = [
       bindTwitter.toJSON(),
       repostPoll.toJSON(),
@@ -756,6 +761,7 @@ export class DAOService extends BaseService {
       pollResults.toJSON(),
       closePoll.toJSON(),
       deletePoll.toJSON(),
+      history.toJSON(),
       listActivePolls.toJSON()
     ]
     this.getDiscordCommands().push(...commands)
@@ -913,6 +919,29 @@ export class DAOService extends BaseService {
           this.bindReactionCollector(message)
 
           interaction.editReply(`**Vote ID #${voteId}**`)
+        } else if ('history' === interaction.commandName) {
+          await interaction.deferReply({ephemeral: true})
+          const users = this.getUsersByDiscordUserId(interaction.user.id.toString())
+          const votes = this.getVotesForUsers(users.map(u => u.id))
+          let response = ``
+          if (!votes.length) {
+            response = 'No vote yet.'
+          } else {
+            response = `${votes.length} votes:\n\n`
+            votes.forEach(v => {
+              response += `—
+${v.description.substring(0, 80)}...
+https://discord.com/channels/${v.discord_guild_id}/${v.discord_channel_id}/${v.discord_message_id}
+Vote: ${v.vote_value} (${v.voted_at})
+`
+              if (response.length > 1500) {
+                interaction.followUp({ephemeral: true, content: response})
+                response = '-- followed up from the previous message\n'
+              }
+            })
+          }
+          response += '\n-- end'
+          interaction.editReply(response)
         } else if ('bounded' === interaction.commandName) {
           await interaction.deferReply({ephemeral: true})
           const users = this.getUsersByDiscordUserId(interaction.user.id.toString())
@@ -921,7 +950,15 @@ export class DAOService extends BaseService {
           if (users.length) {
             response += `\n———\n\nCurrently bound web3 wallet(s): \n`
             response += '```fix\n'
-            for (const u of users) response += `${u.web3_public_key} \n`
+            for (const u of users) {
+              response += `${u.web3_public_key} `
+              if (providers.indexOf(StatisticsService) >= 0) {
+                const statisticsService = this.moduleRef.get(StatisticsService);   
+                const owned = statisticsService.getOwnedTokens([u.web3_public_key])
+                response += `owning ${owned.length} token(s)`  
+              }
+              response += `\n`
+            }
             response += '```\n———\n\n'
           } else {
             response += `No web3 wallet bounded yet. Run /bindweb3 command. \n\n———\n`
@@ -1023,6 +1060,12 @@ export class DAOService extends BaseService {
       await this.createPollVote(message.guildId, poll.id, user[0].id, reaction.emoji.name)
       await reaction.users.remove(discordUser)
     });
+  }
+
+  getVotesForUsers(userIds: number[]) {
+    return this.db.prepare(`
+    select pv.*, p.* from poll_votes pv, polls p where pv.poll_id = p.id and user_id in (${userIds.join(',')})
+    `).all({userIds})
   }
 
   getUsersByDiscordUserId(id: string) {
