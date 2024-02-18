@@ -10,6 +10,8 @@ import { NotLarvaLabsParser } from "./parsers/notlarvalabs.parser";
 import { OpenSeaSeaportParser } from "./parsers/opensea.seaport.parser";
 import { OpenSeaWyvernParser } from "./parsers/opensea.wyvern.parser";
 import { LogParser } from "./parsers/parser.definition";
+import { PhunkAuctionHouseParser } from "./parsers/phunk.auctionhouse.parser";
+import { PhunkFlywheelParser } from "./parsers/phunk.flywheel.parser";
 import { RaribleParser } from "./parsers/rarible.parser";
 import { X2Y2Parser } from "./parsers/x2y2.parser";
 
@@ -24,6 +26,9 @@ export const config = {
   nftx_vault_contract_address: '0xB39185e33E8c28e0BB3DbBCe24DA5dEA6379Ae91',
   // Enter the block where your contract has been created
   statistic_initial_block: 18035326,
+  // Transactions moving tokens to contracts are automatically ignored, 
+  // but you can add exception here
+  allowed_contracts: ['0x769a9Fe72aD5dd35D7A28ca85248f5Ffd17916E9'],
   //
   discord_channels: '919681244537716767,968448656221011981',
   discord_client_id: '1139547496033558561',
@@ -120,6 +125,8 @@ export const config = {
   parsers: [
     new OpenSeaWyvernParser(),
     new OpenSeaSeaportParser(),
+    new PhunkFlywheelParser(),
+    new PhunkAuctionHouseParser(),
     new LooksRareParser(),
     new LooksRareV2Parser(),
     new NotLarvaLabsParser(),
