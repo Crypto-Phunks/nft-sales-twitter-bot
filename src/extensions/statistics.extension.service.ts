@@ -397,13 +397,13 @@ Amount:   ${'Ξ'+(Math.floor(r.amount*100)/100).toFixed(2)}`)
             {
               key: 'notlarvalabs',
               templateKey: '<nll_volume>',
-              name: 'Not Larva Labs',
+              name: 'NotLarvaLabs',
               volume: '0'
             },
             {
               key: 'looksrare',
               templateKey: '<lr_volume>',
-              name: 'Looks Rare',
+              name: 'LooksRare',
               volume: '0'
             },
             {
@@ -415,13 +415,13 @@ Amount:   ${'Ξ'+(Math.floor(r.amount*100)/100).toFixed(2)}`)
             {
               key: 'opensea',
               templateKey: '<os_volume>',
-              name: 'Open Sea',
+              name: 'OpenSea',
               volume: '0'
             },
             {
               key: 'blurio',
               templateKey: '<blurio_volume>',
-              name: 'Blur IO',
+              name: 'BlurIO',
               volume: '0'
             },
             {
@@ -440,6 +440,18 @@ Amount:   ${'Ξ'+(Math.floor(r.amount*100)/100).toFixed(2)}`)
               key: 'rarible',
               templateKey: '<rarible_volume>',
               name: 'Rarible',
+              volume: '0'
+            },
+                        {
+              key: 'phunkauctionhouse',
+              templateKey: '<phunkauctionhouse_volume>',
+              name: 'Auctions',
+              volume: '0'
+            },
+            {
+              key: 'phunkflywheel',
+              templateKey: '<phunkflywheel_volume>',
+              name: 'FlyWheel',
               volume: '0'
             },
             {
