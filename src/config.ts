@@ -20,6 +20,7 @@ export const config = {
   // delaying tweets improve flash bot detection because we have 
   // more time to analyze the mempool
   do_no_delay_tweets: true,
+  ignore_these_platforms: ['phunkflywheel', 'phunkauctionhouse'],
   // Contract Address ======================================== //
   arcade_api_key: '4C77emHoAhekTX2Tf9DMHIRhTn39E2zKQDGTyV1ExWRaNzslW',
   contract_address: '0xf07468ead8cf26c752c676e43c814fee9c8cf402',
