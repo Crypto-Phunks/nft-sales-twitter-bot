@@ -16,9 +16,11 @@ import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { JwtModule } from '@nestjs/jwt';
 import { EthscriptionsSalesService } from './ethscriptions.sales.service';
+import { PhunksTreasuryService } from './extensions/phunks.treasury.service';
 
 export const providers:Provider[] = [
   Erc721SalesService,
+  PhunksTreasuryService,
   //EthscriptionsSalesService,
   //PhunksErc721SpecialisedSalesService,
   ////
