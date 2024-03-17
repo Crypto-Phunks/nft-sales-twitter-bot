@@ -202,8 +202,21 @@ export class BaseService {
   }
 
   async dispatch(data: TweetRequest) {
-    const tweet = await this.tweet(data)
-    await this.discord(data, tweet.id)
+    let tweetId = '-1'
+    if (config.ignore_these_platforms.includes(data.platform)) {
+      logger.info(`ignoring ${data.platform} platform`)
+      return
+    }
+    if (process.env.DISABLE_TWEETS !== 'true') {
+      try {
+        const tweet = await this.tweet(data)
+        tweetId = tweet.id
+      } catch (error) {
+        logger.error(`error while tweeting ${error}`, error)
+      }
+    }
+    if (process.env.DISABLE_DISCORD === 'true') return
+    await this.discord(data, tweetId)
   }
   
   async discord(data: TweetRequest, 
@@ -245,7 +258,7 @@ export class BaseService {
     let tweetText = this.formatText(data, template)
 
     // Delay tweets when running live
-    if (!global.doNotStartAutomatically)
+    if (!global.doNotStartAutomatically && config.do_no_delay_tweets !== true)
       await new Promise( resolve => setTimeout(resolve, 30000) );
     
     // Format our image to base64
@@ -315,7 +328,6 @@ export class BaseService {
       data.platform
     template = template.replace(new RegExp('<platform>', 'g'), platform);
     template = template.replace(new RegExp('<additionalText>', 'g'), data.additionalText);
-
 
     if (config.enable_flashbot_detection && data.eventType !== 'loans')
       template += ` — Flashbots Protect RPC: ${this.isTransactionFlashbotted(data.transactionHash) ? 'Yes' : 'No'}`

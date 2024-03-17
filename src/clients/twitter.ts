@@ -15,25 +15,25 @@ export default class TwitterClient {
     }) : undefined;    
   }
 
-  async startLogin() {
+  async startLogin(url:string=config.twitterAPIRedirectURL) {
     const client = new TwitterApi({
       clientId: process.env.TWITTER_CLIENT_ID,
       clientSecret: process.env.TWITTER_CLIENT_SECRET
     })
-    const result = client.generateOAuth2AuthLink(config.twitterAPIRedirectURL, {
+    const result = client.generateOAuth2AuthLink(url, {
         scope: ['tweet.read', 'users.read']
     })
 
     return result
   }
 
-  async finalizeLogin(infos: any, request: BindTwitterRequestDto):Promise<BindTwitterResultDto> {
+  async finalizeLogin(infos: any, code:string):Promise<BindTwitterResultDto> {
     const client = new TwitterApi({
       clientId: process.env.TWITTER_CLIENT_ID,
       clientSecret: process.env.TWITTER_CLIENT_SECRET
     })
     const { client: userClient, accessToken, refreshToken } = await client.loginWithOAuth2({
-      code: request.code,
+      code,
       codeVerifier: infos.codeVerifier,
       redirectUri: `${config.twitterAPIRedirectURL}`
     })
@@ -52,16 +52,6 @@ export default class TwitterClient {
       accessToken,
       refreshToken
     }
-    /*
-
-currentUser {
-  data: {
-    created_at: '2021-08-11T19:58:06.000Z',
-    id: '1425547057486520329',
-    name: 'tat2bu.eth',
-    username: 'tat2bu'
-  }
-}*/
   }
   
   uploadMedia(processedImage: Buffer, options: { mimeType: EUploadMimeType; }): string | PromiseLike<string> {

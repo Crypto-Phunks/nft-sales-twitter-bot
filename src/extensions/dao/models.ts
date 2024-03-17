@@ -1,14 +1,17 @@
 export interface BindWeb3RequestDto {
-    signature:string;
-    account:string;
-    discordUserId:string;
-    discordUsername:string;
-    discordAccessToken:string;
+    discordUserId?: string;
+    discordUsername?: string;
+    account?:string;
+    twitterUserId?:string;
+    twitterState?:string;
+    twitterCode?:string;
+    discordAccessToken?:string;
 }
 
 export interface BindTwitterRequestDto {
     state:string;
     code:string;
+    wallet:string;
 }
 
 export interface BindTwitterResultDto {
@@ -22,8 +25,9 @@ export interface BindTwitterResultDto {
 }
 
 export interface DAORoleConfigurationDto {
-    guildId:string,
-    roleId:string,
+    guildId?:string,
+    name?:string,
+    roleId?:string,
     gracePeriod?:number,
     twitter?:any,
     minted?: boolean,

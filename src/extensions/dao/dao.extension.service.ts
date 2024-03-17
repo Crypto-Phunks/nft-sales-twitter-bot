@@ -9,8 +9,8 @@ import { REST } from '@discordjs/rest';
 import { config } from '../../config';
 import { PermissionFlagsBits, Routes } from 'discord-api-types/v9'
 import { ethers } from 'ethers';
-import { BindWeb3RequestDto, BindTwitterRequestDto, BindTwitterResultDto } from './models';
-import { SignatureError } from './errors';
+import { BindWeb3RequestDto, BindTwitterRequestDto, BindTwitterResultDto, DAORoleConfigurationDto } from './models';
+import { MissingRequirementsError, SignatureError } from './errors';
 import { catchError, firstValueFrom } from 'rxjs';
 import { AxiosError } from 'axios';
 import { StatisticsService } from '../statistics.extension.service';
@@ -22,6 +22,8 @@ import { unique } from 'src/utils/array.utils';
 import { decrypt, encrypt } from './crypto';
 import { de } from 'date-fns/locale';
 import { utcToZonedTime } from 'date-fns-tz';
+import { get } from 'http';
+import { stat } from 'fs';
 
 const logger = createLogger('dao.extension.service')
 
@@ -43,27 +45,32 @@ export class DAOService extends BaseService {
   ) {
     super(http)
     logger.info('created DAOService')
-    
+    process.env.TZ = 'Etc/UTC';
+
     this.discordClient.init(() => {
       this.registerCommands()
       this.start()
 
 
       if (config.dao_roles.length) {
-        setTimeout(() => this.rebindActivePolls(), 3000)
         setTimeout(() => this.grantRoles(), 10000)
-        setTimeout(() => this.handleEndedPolls(), 5000)
       }
+      setTimeout(() => this.rebindActivePolls(), 3000)
+      setTimeout(() => this.handleEndedPolls(), 5000)
     })
   }
 
   async rebindActivePolls() {
     const polls = this.getActivePolls()
     for (const poll of polls) {
-      const channel = await this.discordClient.getClient().channels.fetch(poll.discord_channel_id.toString()) as TextChannel;
-      console.log(`fetched ${poll.discord_channel_id} as ${channel}`)
-      const voteMessage = await channel.messages.fetch(poll.discord_message_id)
-      this.bindReactionCollector(voteMessage)
+      try {
+        const channel = await this.discordClient.getClient().channels.fetch(poll.discord_channel_id.toString()) as TextChannel;
+        console.log(`fetched ${poll.discord_channel_id} as ${channel}`)
+        const voteMessage = await channel.messages.fetch(poll.discord_message_id)
+        this.bindReactionCollector(voteMessage)
+      } catch (error) {
+        console.log(`cannot rebind ${poll.discord_channel_id}, continuing`)
+      }
     }
   }
 
@@ -86,15 +93,16 @@ export class DAOService extends BaseService {
     this.db.prepare(
       `CREATE TABLE IF NOT EXISTS accounts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        discord_user_id text NOT NULL,
-        discord_username text NOT NULL,
-        web3_public_key text NOT NULL UNIQUE
+        twitter_user_id text,
+        discord_user_id text,
+        discord_username text,
+        web3_public_key text UNIQUE
       );`,
     ).run();
     this.db.prepare(
       `CREATE TABLE IF NOT EXISTS twitter_accounts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        discord_user_id text NOT NULL UNIQUE,
+        discord_user_id text UNIQUE,
         twitter_user_id text NOT NULL UNIQUE,
         twitter_created_at text NOT NULL,
         twitter_name text NOT NULL,
@@ -122,11 +130,11 @@ export class DAOService extends BaseService {
     this.db.prepare(
       `CREATE TABLE IF NOT EXISTS poll_votes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        discord_guild_id text NOT NULL,
-        discord_message_id text NOT NULL,
-        discord_user_id text NOT NULL,
+        poll_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
         vote_value text NOT NULL,
         voted_at text NOT NULL,
+        ip_address text,
         vote_origin text
       );`,
     ).run();
@@ -141,68 +149,77 @@ export class DAOService extends BaseService {
     ).run();
   }
 
+  async checkCondition(conf:DAORoleConfigurationDto, users:any[]) {
+    if (users.length === 0) return false
+    if (providers.indexOf(StatisticsService) === 0) return false
+    const statisticsService = this.moduleRef.get(StatisticsService);  
+    let conditionSucceeded = false
+    if (conf.minOwnedCount) {
+      const owned = await statisticsService.getOwnedTokens(users.map(u => u.web3_public_key))
+      conditionSucceeded = owned.length >= conf.minOwnedCount
+      if (conditionSucceeded && conf.minOwnedTime) {
+        const maxOwnedTime = Math.max(...owned.map(o => o.owned_since))
+        
+        if (maxOwnedTime < conf.minOwnedTime) {
+          conditionSucceeded = false
+        }
+      }
+    } else if (conf.minted) {
+      const numberMinted = await statisticsService.getMintedTokens(users.map(u => u.web3_public_key))
+      conditionSucceeded = numberMinted.length > 0
+    } else if (conf.twitter) {
+      conditionSucceeded = true
+      
+      const twitterUser = this.getTwitterUsersByUserIds(users.map(u => u.id))
+      if (!twitterUser.length) conditionSucceeded = false
+      if (conditionSucceeded && conf.twitter.age) {
+        // check age
+        const beforeDate = format(new Date().getTime() - conf.twitter.age*1000, "yyyy-MM-dd'T'HH:mm:ss'Z'")
+
+        if (new Date(beforeDate).getTime() > new Date(twitterUser.twitter_created_at).getTime()) {
+          conditionSucceeded = false
+        }
+      }
+    } else if (conf.specificTrait) {
+      const owned = await statisticsService.getOwnedTokens(users.map(u => u.web3_public_key))
+      const matching = owned.map(async (o) => {
+        const tokenId = o.token_id.toString().padStart(4, '0')
+        const metadata = await this.getTokenMetadata(tokenId, false)
+        let result = false
+        if (conf.specificTrait.traitType) {
+          const toCheck = metadata.metadata.attributes.filter(a => a.trait_type === conf.specificTrait.traitType)
+          result = toCheck.length && toCheck[0].value === conf.specificTrait.traitValue
+        } else if (conf.specificTrait.hasOwnProperty('count')) {
+          result = metadata.metadata.attributes.length >= conf.specificTrait.count
+        }
+        return result ? o : undefined
+      })
+      let r = await Promise.all(matching)
+      r = r.filter(o => o !== undefined)
+      conditionSucceeded = r.length > 0
+    }    
+    return conditionSucceeded
+  }
+
   async grantRoles() {
     try {
       if (providers.indexOf(StatisticsService) >= 0) {
         // logger.info(`grantRoles()`)
-        const statisticsService = this.moduleRef.get(StatisticsService);
-
         for (let conf of config.dao_roles) {
           const guild = await this.discordClient.getClient().guilds.fetch(conf.guildId)
           const role = await guild.roles.fetch(conf.roleId)
+          if (!role) {
+            logger.warn(`cannot find role ${conf.roleId} in guild ${guild.name} #${conf.guildId}`)
+            continue
+          }
           const members = await guild.members.fetch({ force: true })
           for (const m of members) {
             const member = m[1]
-            //logger.info(`checking ${member.displayName} for role ${role.name}`)
+            // logger.info(`checking ${member.displayName} for role ${role.name}`)
             const users = this.getUsersByDiscordUserId(member.id.toString()) ?? []
-            const twitterUsers = this.getTwitterUsersByDiscordUserId(member.id.toString()) ?? []
+            //const twitterUsers = this.getTwitterUsersByDiscordUserId(member.id.toString()) ?? []
 
-            let conditionSucceeded = false            
-            if (users.length || twitterUsers.length) {
-              if (conf.minOwnedCount) {
-                const owned = await statisticsService.getOwnedTokens(users.map(u => u.web3_public_key))
-                conditionSucceeded = owned.length >= conf.minOwnedCount
-                if (conditionSucceeded && conf.minOwnedTime) {
-                  const maxOwnedTime = Math.max(...owned.map(o => o.owned_since))
-                  
-                  if (maxOwnedTime < conf.minOwnedTime) {
-                    conditionSucceeded = false
-                  }
-                }
-              } else if (conf.minted) {
-                const numberMinted = await statisticsService.getMintedTokens(users.map(u => u.web3_public_key))
-                conditionSucceeded = numberMinted.length > 0
-              } else if (conf.twitter) {
-                conditionSucceeded = true
-                const twitterUser = this.getTwitterUsersByDiscordUserId(member.id.toString())
-                if (!twitterUser.length) conditionSucceeded = false
-                if (conditionSucceeded && conf.twitter.age) {
-                  // check age
-                  const beforeDate = format(new Date().getTime() - conf.twitter.age*1000, "yyyy-MM-dd'T'HH:mm:ss'Z'")
-
-                  if (new Date(beforeDate).getTime() > new Date(twitterUser.twitter_created_at).getTime()) {
-                    conditionSucceeded = false
-                  }
-                }
-              } else if (conf.specificTrait) {
-                const owned = await statisticsService.getOwnedTokens(users.map(u => u.web3_public_key))
-                const matching = owned.map(async (o) => {
-                  const tokenId = o.token_id.toString().padStart(4, '0')
-                  const metadata = await this.getTokenMetadata(tokenId, false)
-                  let result = false
-                  if (conf.specificTrait.traitType) {
-                    const toCheck = metadata.metadata.attributes.filter(a => a.trait_type === conf.specificTrait.traitType)
-                    result = toCheck.length && toCheck[0].value === conf.specificTrait.traitValue
-                  } else if (conf.specificTrait.hasOwnProperty('count')) {
-                    result = metadata.metadata.attributes.length >= conf.specificTrait.count
-                  }
-                  return result ? o : undefined
-                })
-                let r = await Promise.all(matching)
-                r = r.filter(o => o !== undefined)
-                conditionSucceeded = r.length > 0
-              }
-            } 
+            let conditionSucceeded = await this.checkCondition(conf, users)
             if (conditionSucceeded && !conf.disallowAll) {
               // console.log(`--> granting ${role.name} to ${member.displayName}`)
               await member.roles.add(role)  
@@ -231,10 +248,6 @@ export class DAOService extends BaseService {
         await this.handleGracePeriods()
         setTimeout(() => this.grantRoles(), 60000*5)        
       }
-      /*
-      guilds.roles.cache.find(role => role.name === "role name");
-      member.roles.add(role);
-      */
     } catch (err) {
       console.warn('cannot grant roles', err)
     }
@@ -242,7 +255,8 @@ export class DAOService extends BaseService {
   
   async bindTwitterAccount(request: BindTwitterRequestDto) {
      const infos = this.currentTwitterAuthRequests.get(request.state)
-     const twitterDatas = await this.twitterClient.finalizeLogin(infos, request)
+     this.currentTwitterAuthRequests.delete(request.state)
+     const twitterDatas = await this.twitterClient.finalizeLogin(infos, request.code)
      twitterDatas.discordUserId = infos.discord_user_id
 
     // encrypt datas
@@ -254,7 +268,7 @@ export class DAOService extends BaseService {
       twitterDatas.createdAt = encrypt(twitterDatas.createdAt, key)
       twitterDatas.name = encrypt(twitterDatas.name, key)
       twitterDatas.username = encrypt(twitterDatas.username, key)
-      twitterDatas.discordUserId = encrypt(twitterDatas.discordUserId, key)
+      if (twitterDatas.discordUserId) twitterDatas.discordUserId = encrypt(twitterDatas.discordUserId, key)
       twitterDatas.accessToken = encrypt(twitterDatas.accessToken, key)
       twitterDatas.refreshToken = encrypt(twitterDatas.refreshToken, key)
     }
@@ -267,48 +281,71 @@ export class DAOService extends BaseService {
           twitter_created_at = excluded.twitter_created_at, twitter_name = excluded.twitter_name,
           twitter_username = excluded.twitter_username, refresh_token = excluded.refresh_token,
           access_token = excluded.access_token
+      ON CONFLICT(twitter_user_id) DO UPDATE 
+      SET discord_user_id = excluded.discord_user_id, twitter_user_id = excluded.twitter_user_id,
+          twitter_created_at = excluded.twitter_created_at, twitter_name = excluded.twitter_name,
+          twitter_username = excluded.twitter_username, refresh_token = excluded.refresh_token,
+          access_token = excluded.access_token          
     `)
     stmt.run(twitterDatas)
+
+    this.db.prepare(`
+      UPDATE accounts SET twitter_user_id = @twitterUserId WHERE lower(web3_public_key) = @wallet
+    `).run({
+      twitterUserId: twitterDatas.id,
+      wallet: request.wallet.toLowerCase()
+    })
+    return twitterDatas
   }
 
   async bindWeb3Account(request: BindWeb3RequestDto) {
+    /*
+    if (!request.discordUserId && !request.twitterUserId) {
+      throw new SignatureError('no correlation id')
+    } 
+    */
+    if (request.discordAccessToken) {
+      const { data } = await firstValueFrom(this.http.get('https://discord.com/api/users/@me', {
+        headers: {
+          authorization: `Bearer ${request.discordAccessToken}`,
+        }
+      }).pipe(
+        catchError((error: AxiosError) => {
+          logger.error(error)
+          throw 'An error happened!';
+        }),
+      ))
+      request.discordUserId = data.id
+      request.discordUsername = data.username
+    }
 
-    // TODO check discord account
-    const { data } = await firstValueFrom(this.http.get('https://discord.com/api/users/@me', {
-      headers: {
-        authorization: `Bearer ${request.discordAccessToken}`,
-      }
-    }).pipe(
-      catchError((error: AxiosError) => {
-        logger.error(error)
-        throw 'An error happened!';
-      }),
-    ))
-    if (data.id != request.discordUserId) {
-      throw new SignatureError('invalid discord user id')
+    if (!request.twitterUserId) {
+      request.twitterUserId = null
     }
-    const signerAddr = await ethers.verifyMessage('This signature is safe and will bind your wallet to your discord user ID.', request.signature);
-    if (signerAddr.toLowerCase() !== request.account.toLowerCase()) {
-      throw new SignatureError('invalid signature')
+    if (!request.discordUserId) {
+      request.discordUserId = null
     }
-    
-    // encrypt datas
-    if (config.dao_requires_encryption_key) {
-      // TODO handle guild id
-      const key = this.encryptionKeys.values().next().value
-      request.account = encrypt(request.account, key)
-      request.discordUsername = encrypt(request.discordUsername, key)
-      request.discordUserId = encrypt(request.discordUserId, key)
+    if (!request.discordUsername) {
+      request.discordUsername = null
     }
 
     //console.log('request', request)
 
     const stmt = this.db.prepare(`
-      INSERT INTO accounts (discord_user_id, discord_username, web3_public_key)
-      VALUES (@discordUserId, @discordUsername, @account)
-      ON CONFLICT(web3_public_key) DO UPDATE SET discord_user_id = excluded.discord_user_id, discord_username = excluded.discord_username
+      INSERT INTO accounts (discord_user_id, discord_username, twitter_user_id, web3_public_key)
+      VALUES (@discordUserId, @discordUsername, @twitterUserId, @account)
+      ON CONFLICT(web3_public_key) DO UPDATE 
+      SET discord_user_id = excluded.discord_user_id, discord_username = excluded.discord_username,
+      twitter_user_id = excluded.twitter_user_id
     `)
     stmt.run(request)
+  }
+
+  async checkWeb3Signature(request: {wallet:string, signature:string}) {
+    const signerAddr = await ethers.verifyMessage('This signature is safe and will bind your wallet to your DAO user ID.', request.signature);
+    if (signerAddr.toLowerCase() !== request.wallet.toLowerCase()) {
+      throw new SignatureError('invalid signature')
+    }
   }
 
   hasGracePeriod(guildId: string, userId: string, roleId: string) {
@@ -349,9 +386,12 @@ export class DAOService extends BaseService {
     `).all()
   }
 
-  getAllPolls() {
+  getAllPolls(params:{withoutRepost:boolean}={withoutRepost: false}) {
     return this.db.prepare(`
-      SELECT * FROM polls ORDER BY until DESC
+      SELECT *
+      FROM polls
+      ${params.withoutRepost ? 'WHERE linked_poll_id IS NULL' : ''}
+      ORDER BY until DESC
     `).all()
   }
 
@@ -375,36 +415,46 @@ export class DAOService extends BaseService {
     `).get({id})
   }
 
-  async closePoll(messageId:string) {
-    const poll = this.getPoll(messageId)
+  getPollByDiscordMessageId(id:string) {
+    return this.db.prepare(`
+      SELECT * FROM polls
+      WHERE discord_message_id = :id
+    `).get({id})
+  }
+
+  async closePoll(pollId:string, guildId:string, triggerReveal:boolean=false) {
+    const poll = this.getPollById(pollId)
+    if (!poll) return
     this.db.prepare(`UPDATE polls SET until = DATETIME('now', '-5 minutes')
-      WHERE discord_message_id = @messageId`)
-      .run({messageId: messageId})
+      WHERE id = @pollId AND discord_guild_id = @guildId`)
+      .run({pollId, guildId})
 
     const linkedPolls = this.getAllLinkedPolls(poll.id)
     for (const linkedPoll of linkedPolls) {
-      this.deletePoll(linkedPoll.discord_message_id)
-    }      
+      this.closePoll(linkedPoll.id, linkedPoll.discord_guild_id)
+    }
+    this.handleEndedPolls()
   }
 
-  async deletePoll(messageId:string, linked:boolean = false) {
-    const poll = this.getPoll(messageId)
+  async deletePoll(pollId:string, guildId:string, linked:boolean = false) {
+    const poll = this.getPollById(pollId)
+    if (!poll) return
     if (poll === undefined) {
-      logger.warn(`cannot find poll for message id ${messageId}`)
+      logger.warn(`cannot find poll for poll id ${pollId}`)
       return
     }
     this.db.prepare(`DELETE FROM polls
-      WHERE discord_message_id = @messageId`)
-      .run({messageId: messageId})
+      WHERE id = @pollId and discord_guild_id = @guildId`)
+      .run({pollId, guildId})
     const channel = await this.discordClient.getClient().channels.cache.get(poll.discord_channel_id) as TextChannel;      
-    const voteMessage = await channel.messages.fetch(messageId)
+    const voteMessage = await channel.messages.fetch(poll.discord_message_id)
     const message = linked ? `Root poll has been deleted.` : `Poll deleted.`
-    await voteMessage.edit(message)
+    await voteMessage.edit({content: message, embeds: []})
     await voteMessage.reactions.removeAll()
 
     const linkedPolls = this.getAllLinkedPolls(poll.id)
     for (const linkedPoll of linkedPolls) {
-      this.deletePoll(linkedPoll.discord_message_id, true)
+      this.deletePoll(linkedPoll.id, linkedPoll.discord_guild_id, true)
     }
   }
 
@@ -415,63 +465,67 @@ export class DAOService extends BaseService {
     `)  
     const all = stmt.all()
     for (let poll of all) {
-      let initialPoll = poll
-      if (poll.linked_poll_id !== null) {
-        initialPoll = this.db.prepare(`SELECT * FROM polls WHERE id = @id`).get({id: poll.linked_poll_id})
-      }
-  
-      //console.log(row)
-      const votes = this.getPollResults(initialPoll.discord_message_id)
-      let message = `${poll.description}\n\nResults @everyone:\n———\n`
-      votes.forEach(vote => {
-        message += `${vote.vote_value}\t${vote.count}\n———\n`
-      });
-      message += `Poll ID: ${poll.discord_message_id}\n`
-      if (poll.minimum_votes_required > 0) {
-        message += `Minimum votes required was: ${poll.minimum_votes_required}\n`
-      }
-      
-      const channel = await this.discordClient.getClient().channels.cache.get(poll.discord_channel_id) as TextChannel;
-      if (!channel) {
-        logger.warn(`cannot find channel for ended vote: ${poll.discord_channel_id}`)
-        continue
-      }
-      const titleText = `⏰ • Vote ended`
-      const title = `${titleText} ${poll.link ?? ''}` 
+      try {
+        let initialPoll = poll
+        if (poll.linked_poll_id !== null) {
+          initialPoll = this.db.prepare(`SELECT * FROM polls WHERE id = @id`).get({id: poll.linked_poll_id})
+        }
+    
+        //console.log(row)
+        const votes = this.getPollResults(initialPoll.id)
+        let message = `${poll.description}\n\nResults @everyone:\n———\n`
+        votes.forEach(vote => {
+          message += `${vote.vote_value}\t${vote.count}\n———\n`
+        });
+        message += `Poll ID: ${poll.id}\n`
+        if (poll.minimum_votes_required > 0) {
+          message += `Minimum votes required was: ${poll.minimum_votes_required}\n`
+        }
+        
+        const channel = await this.discordClient.getClient().channels.cache.get(poll.discord_channel_id) as TextChannel;
+        if (!channel) {
+          logger.warn(`cannot find channel for ended vote: ${poll.discord_channel_id}`)
+          continue
+        }
+        const titleText = `⏰ • Vote ended`
+        const title = `${titleText} ${poll.link ?? ''}` 
 
-      const embed = new MessageEmbed()
-        .setColor('#CCCCCC' as HexColorString)
-        .setTitle(title)
-        .setDescription(message)
-        .setTimestamp();   
-              
-      const voteMessage = await channel.messages.fetch(poll.discord_message_id)
-      await voteMessage.edit({
-        embeds: [embed]
-      })
-      await voteMessage.reactions.removeAll()
-      this.db.prepare(`UPDATE polls SET revealed = TRUE WHERE discord_message_id = @messageId`).run({messageId: poll.discord_message_id})
+        const embed = new MessageEmbed()
+          .setColor('#CCCCCC' as HexColorString)
+          .setTitle(title)
+          .setDescription(message)
+          .setTimestamp();   
+                
+        const voteMessage = await channel.messages.fetch(poll.discord_message_id)
+        await voteMessage.edit({
+          embeds: [embed]
+        })
+        await voteMessage.reactions.removeAll()
+        this.db.prepare(`UPDATE polls SET revealed = TRUE WHERE discord_message_id = @messageId`).run({messageId: poll.discord_message_id})
+      } catch (err) {
+        console.warn(err)
+      }
     }
     logger.info('cleaned end polls')
     setTimeout(() => this.handleEndedPolls(), 60000*10)
   }
 
-  getPollResults(discord_message_id: any) {
+  getPollResults(voteId: any) {
     const votesStmt = this.db.prepare(`
         SELECT vote_value, count(*) as count FROM poll_votes
-        WHERE discord_message_id = @messageId
+        WHERE poll_id = @voteId or poll_id in (SELECT linked_poll_id FROM polls WHERE id = @voteId)
         group by 1
       `)  
-    return votesStmt.all({messageId: discord_message_id})
+    return votesStmt.all({voteId})
   }
 
-  getDetailedPollResults(discord_message_id: any) {
+  getDetailedPollResults(voteId: any) {
     const votesStmt = this.db.prepare(`
-        SELECT * FROM poll_votes
-        WHERE discord_message_id = @messageId
-        group by 1
+      SELECT * FROM poll_votes pv, accounts a
+      WHERE a.id = pv.user_id and poll_id = @voteId
+      group by 1
       `)  
-    return votesStmt.all({messageId: discord_message_id})
+    return votesStmt.all({voteId})
   }
 
   removeGracePeriod(guildId: string, userId: string, roleId: string) {
@@ -507,53 +561,83 @@ export class DAOService extends BaseService {
     return info.lastInsertRowid
   }
 
-  async createPollVote(guildId:string, messageId:string, userId:string, value:string) {
-    let poll = this.db.prepare(`SELECT * FROM polls WHERE discord_message_id = @messageId`).get({messageId})
+  async createPollVote(guildId:string, voteId:string, userId:number, value:string, ipAddress:string=undefined) {
+    const user = this.getUserById(userId)
+    let poll = this.db.prepare(`SELECT * FROM polls WHERE id = @voteId`).get({voteId})
     let initialPoll = poll
     if (poll.linked_poll_id !== null) {
       initialPoll = this.db.prepare(`SELECT * FROM polls WHERE id = @id`).get({id: poll.linked_poll_id})
+    }
+    if (poll.revealed || initialPoll.revealed) {
+      console.log('poll already revealed')
+      return
     }
     if (poll.allowed_emojis.indexOf(value) === -1) {
       console.log('not an allowed emoji')
       return
     }
-    const guild = this.discordClient.getClient().guilds.cache.get(guildId)
-    const member = await guild.members.cache.get(userId)
-    if (poll.discord_role_id && !member.roles.cache.has(poll.discord_role_id)) {
-      try {
-        const dm = await member.createDM(true)
-        await dm.send("You don't have the required role to vote on this poll.")
-      } catch (err) {
-        // ignored, dm disabled by user
+
+    if (guildId !== 'web') {
+      const guild = this.discordClient.getClient().guilds.cache.get(guildId)
+      const member = await guild.members.fetch(user.discord_user_id)
+      if (member.user.bot) return
+      // if (poll.discord_role_id && !member.roles.cache.has(poll.discord_role_id)) {    
+      if (poll.discord_role_id && (member as any)._roles.indexOf(poll.discord_role_id) === -1) {
+        try {
+          const dm = await member.createDM(true)
+          await dm.send("You don't have the required role to vote on this poll.")
+        } catch (err) {
+          // ignored, dm disabled by user
+        }
+        return
+      } 
+    } else {
+      // check role vote web
+      logger.info('checking role vote web')
+      const requirements = []
+      let missingRequirements = false
+      for (const requirement of config.dao_web_vote_requirements) {
+        const check = await this.checkCondition(requirement, [user])
+        requirements.push({name: requirement.name, success: check})
+        if (!check) missingRequirements = true
       }
-      return
-    } 
+      if (missingRequirements) {
+        throw new MissingRequirementsError(requirements)
+      }
+    }
+    
     this.db.prepare(`
       DELETE FROM poll_votes WHERE 
-      discord_guild_id = @guildId AND
-      discord_message_id = @messageId AND
-      discord_user_id = @userId
+      poll_id = @voteId AND
+      user_id IN (SELECT id FROM accounts WHERE discord_user_id = @discordUserId OR twitter_user_id = @twitterUserId)
     `).run({
-      guildId: initialPoll.discord_guild_id, messageId: initialPoll.discord_message_id, userId
+      voteId: initialPoll.id, discordUserId: user.discord_user_id, twitterUserId: user.twitter_user_id
     })
     const stmt = this.db.prepare(`
-      INSERT INTO poll_votes (discord_guild_id, discord_message_id, discord_user_id, vote_value, voted_at, vote_origin)
-      VALUES (@guildId, @messageId, @userId, @value, datetime(), @voteOrigin)
+      INSERT INTO poll_votes (poll_id, user_id, vote_value, voted_at, vote_origin, ip_address)
+      VALUES (@pollId, @userId, @value, datetime(), @voteOrigin, @ipAddress)
     `)    
-    const voteOrigin = `https://discord.com/channels/${poll.discord_guild_id}/${poll.discord_channel_id}/${poll.discord_message_id}`
+    const voteOrigin = 
+      guildId === 'web' ? 'web' :
+      `https://discord.com/channels/${poll.discord_guild_id}/${poll.discord_channel_id}/${poll.discord_message_id}`
     stmt.run({
-      guildId:initialPoll.discord_guild_id, 
-      messageId: initialPoll.discord_message_id, userId, value, voteOrigin
+      pollId: initialPoll.id, 
+      userId, value, voteOrigin, ipAddress
     })
-    try {
-      const dm = await member.createDM(true)
-      await dm.send(`Your vote on https://discord.com/channels/${poll.discord_guild_id}/${poll.discord_channel_id}/${poll.discord_message_id} has been recorded.`)
-    } catch (err) {
-      // ignored, dm disabled by user
-    }    
+
+    if (guildId !== 'web') {
+      const guild = this.discordClient.getClient().guilds.cache.get(guildId)
+      const member = await guild.members.cache.get(user.discord_user_id)      
+      try {
+        const dm = await member.createDM(true)
+        await dm.send(`Your vote on https://discord.com/channels/${poll.discord_guild_id}/${poll.discord_channel_id}/${poll.discord_message_id} has been recorded.`)
+      } catch (err) {
+        // ignored, dm disabled by user
+      }    
+    }
 
     // update poll message if a minimum number of votes is required
-    const voteCount = this.getPollResults(messageId).reduce((a, b) => a + b.count, 0)
+    const voteCount = this.getPollResults(voteId).reduce((a, b) => a + b.count, 0)
     const channel = await this.discordClient.getClient().channels.cache.get(poll.discord_channel_id) as TextChannel;
     if (!channel) {
       logger.warn(`cannot find channel for ended vote: ${poll.discord_channel_id}`)
@@ -568,6 +652,21 @@ export class DAOService extends BaseService {
     await message.edit({
       embeds: [embed]
     })
+
+    // update linked polls too
+    const others = this.db.prepare(`
+      SELECT * FROM polls 
+      WHERE linked_poll_id = @voteId OR id = @voteId OR id IN (select linked_poll_id FROM polls where id = @voteId)
+      ORDER BY until DESC
+    `).all({voteId})
+    for (const other of others) {
+      const channel = await this.discordClient.getClient().channels.cache.get(other.discord_channel_id) as TextChannel;
+      const message = await channel.messages.fetch(other.discord_message_id)
+      const embed = this.formatVoteMessage(poll.description, untilUTC, poll.link, other.discord_role_id, poll.minimum_votes_required, voteCount)
+      await message.edit({
+        embeds: [embed]
+      })
+    }
   }
 
   async registerCommands() {
@@ -583,7 +682,7 @@ export class DAOService extends BaseService {
     const createPoll = new SlashCommandBuilder()
       .setName('createpoll')
       .setDescription('Create a new poll')
-      .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+      .setDefaultMemberPermissions(process.env.DAO_DO_NO_REQUEST_ADMIN === 'true' ? null : PermissionFlagsBits.Administrator)
       .addStringOption(option => option.setName('description')
         .setDescription('The message displayed to other users')
         .setRequired(true))
@@ -606,7 +705,7 @@ export class DAOService extends BaseService {
       const repostPoll = new SlashCommandBuilder()
         .setName('repostpoll')
         .setDescription('Repost an existing poll into another discord server')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+        .setDefaultMemberPermissions(process.env.DAO_DO_NO_REQUEST_ADMIN === 'true' ? null : PermissionFlagsBits.Administrator)
         .addIntegerOption(option => option.setName('pollid')
           .setDescription('The initial poll ID')
           .setRequired(true))        
@@ -620,7 +719,7 @@ export class DAOService extends BaseService {
       const pollResults = new SlashCommandBuilder()
         .setName('pollresults')
         .setDescription('Get poll results')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+        .setDefaultMemberPermissions(process.env.DAO_DO_NO_REQUEST_ADMIN === 'true' ? null : PermissionFlagsBits.Administrator)
         .addStringOption(option => option.setName('id')
           .setDescription('The poll ID')
           .setRequired(true))
@@ -628,7 +727,7 @@ export class DAOService extends BaseService {
       const closePoll = new SlashCommandBuilder()
         .setName('closepoll')
         .setDescription('Close poll')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+        .setDefaultMemberPermissions(process.env.DAO_DO_NO_REQUEST_ADMIN === 'true' ? null : PermissionFlagsBits.Administrator)
         .addStringOption(option => option.setName('id')
           .setDescription('The poll ID')
           .setRequired(true))          
@@ -636,7 +735,7 @@ export class DAOService extends BaseService {
       const deletePoll = new SlashCommandBuilder()
         .setName('deletepoll')
         .setDescription('Delete poll')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+        .setDefaultMemberPermissions(process.env.DAO_DO_NO_REQUEST_ADMIN === 'true' ? null : PermissionFlagsBits.Administrator)
         .addStringOption(option => option.setName('id')
           .setDescription('The poll ID')
           .setRequired(true))          
@@ -649,6 +748,10 @@ export class DAOService extends BaseService {
       .setName('bounded')
       .setDescription('Show the web3 wallets and social accounts bounded to your discord account')
 
+    const history = new SlashCommandBuilder()
+      .setName('history')
+      .setDescription('Show the vote history of your account')
+
     const commands = [
       bindTwitter.toJSON(),
       repostPoll.toJSON(),
@@ -658,6 +761,7 @@ export class DAOService extends BaseService {
       pollResults.toJSON(),
       closePoll.toJSON(),
       deletePoll.toJSON(),
+      history.toJSON(),
       listActivePolls.toJSON()
     ]
     this.getDiscordCommands().push(...commands)
@@ -697,6 +801,7 @@ export class DAOService extends BaseService {
           const minimumVotesRequired = poll.minimum_votes_required
           const until = parseISO(poll.until)
           const untilUTC = utcToZonedTime(until, 'Etc/UTC');
+          logger.info(`poll ${poll.until}, until ${until}, untilUTC ${untilUTC}`)
           const embed = this.formatVoteMessage(description, untilUTC, link, roleRequired, minimumVotesRequired)
 
           if (embed.description.length >= 4000) {
@@ -714,9 +819,11 @@ export class DAOService extends BaseService {
           for (let i=0; i < emojis.length; i+=2) { 
             await message.react(emojis[i])
           }
-          this.bindReactionCollector(message)
 
           this.createPoll(interaction.guildId, interaction.channelId, message.id, roleRequired, description, until, allowedEmojis, minimumVotesRequired, link, voteId)
+
+          this.bindReactionCollector(message)
+
           interaction.editReply(`**Vote ID #${poll.id} (cross-posted)**`)
         } else if ('listpolls' === interaction.commandName) {
           await interaction.deferReply({ephemeral: true})
@@ -737,15 +844,15 @@ export class DAOService extends BaseService {
           interaction.editReply(response)
         } else if ('closepoll' === interaction.commandName) {
           await interaction.deferReply()
-          const messageId = interaction.options.get('id')?.value as string
-          this.closePoll(messageId)
+          const pollId = interaction.options.get('id')?.value as string
+          this.closePoll(pollId, interaction.guildId, true)
           const response = `Poll closed.`
           this.handleEndedPolls()
           interaction.editReply(response)
         } else if ('deletepoll' === interaction.commandName) {
           await interaction.deferReply()
           const messageId = interaction.options.get('id')?.value as string
-          this.deletePoll(messageId)
+          this.deletePoll(messageId, interaction.guildId)
           const response = `Poll deleted.`
           this.handleEndedPolls()
           interaction.editReply(response)          
@@ -761,7 +868,13 @@ export class DAOService extends BaseService {
           response += `\nDetailed votes: \n\n`
           const voteDetails = this.getDetailedPollResults(messageId)
           voteDetails.forEach(vote => {
-            response += `${vote.vote_value} <@${vote.discord_user_id}> (${vote.voted_at}) on ${vote.vote_origin} \n`
+            
+            if (vote.discord_user_id === null) {
+              response += `${vote.vote_value} ${vote.web3_public_key.substring(0, 6)}...${vote.web3_public_key.substring(vote.web3_public_key.length-6, vote.web3_public_key.length)} (${vote.voted_at}) using the web UI (${vote.ip_address}) \n`
+            } else {
+              response += `${vote.vote_value} <@${vote.discord_user_id}> (${vote.voted_at}) on ${vote.vote_origin} \n`
+            }
+
             if (response.length > 1500) {
               response += `\n——— continued in next message ———\n`
               interaction.followUp({ephemeral: true, content: response})
@@ -769,7 +882,8 @@ export class DAOService extends BaseService {
             }
           });
           
-          interaction.followUp({ephemeral: true, content: response})
+          if (response.length > 0)
+            interaction.followUp({ephemeral: true, content: response})
 
         } else if ('createpoll' === interaction.commandName) {
           await interaction.deferReply()
@@ -800,10 +914,34 @@ export class DAOService extends BaseService {
           for (let i=0; i < emojis.length; i+=2) { 
             await message.react(emojis[i])
           }
+
+          const voteId = this.createPoll(interaction.guildId, interaction.channelId, message.id, roleRequired, description, until, allowedEmojis, minimumVotesRequired, link)          
           this.bindReactionCollector(message)
 
-          const voteId = this.createPoll(interaction.guildId, interaction.channelId, message.id, roleRequired, description, until, allowedEmojis, minimumVotesRequired, link)
           interaction.editReply(`**Vote ID #${voteId}**`)
+        } else if ('history' === interaction.commandName) {
+          await interaction.deferReply({ephemeral: true})
+          const users = this.getUsersByDiscordUserId(interaction.user.id.toString())
+          const votes = this.getVotesForUsers(users.map(u => u.id))
+          let response = ``
+          if (!votes.length) {
+            response = 'No vote yet.'
+          } else {
+            response = `${votes.length} votes:\n\n`
+            votes.forEach(v => {
+              response += `—
+${v.description.substring(0, 80)}...
+https://discord.com/channels/${v.discord_guild_id}/${v.discord_channel_id}/${v.discord_message_id}
+Vote: ${v.vote_value} (${v.voted_at})
+`
+              if (response.length > 1500) {
+                interaction.followUp({ephemeral: true, content: response})
+                response = '-- followed up from the previous message\n'
+              }
+            })
+          }
+          response += '\n-- end'
+          interaction.editReply(response)
         } else if ('bounded' === interaction.commandName) {
           await interaction.deferReply({ephemeral: true})
           const users = this.getUsersByDiscordUserId(interaction.user.id.toString())
@@ -812,7 +950,15 @@ export class DAOService extends BaseService {
           if (users.length) {
             response += `\n———\n\nCurrently bound web3 wallet(s): \n`
             response += '```fix\n'
-            for (const u of users) response += `${u.web3_public_key} \n`
+            for (const u of users) {
+              response += `${u.web3_public_key} `
+              if (providers.indexOf(StatisticsService) >= 0) {
+                const statisticsService = this.moduleRef.get(StatisticsService);   
+                const owned = statisticsService.getOwnedTokens([u.web3_public_key])
+                response += `owning ${owned.length} token(s)`  
+              }
+              response += `\n`
+            }
             response += '```\n———\n\n'
           } else {
             response += `No web3 wallet bounded yet. Run /bindweb3 command. \n\n———\n`
@@ -834,6 +980,12 @@ export class DAOService extends BaseService {
       }
     }
     this.getDiscordInteractionsListeners().push(listener)
+  }
+
+  async startTwitterLogin() {
+    const result = await this.twitterClient.startLogin() as any
+    this.currentTwitterAuthRequests.set(result.state, result)
+    return result
   }
 
   formatVoteMessage(description:string, until:Date, link:string, roleRequired:string, minimumVotesRequired:number, voteCount:number=0) {
@@ -862,15 +1014,58 @@ export class DAOService extends BaseService {
     return embed
   }
   
-  bindReactionCollector(message: Message) {
-    console.log(`bindReactionCollector ${message}`)
+  async bindReactionCollector(message: Message) {
+    console.log(`bindReactionCollector ${message.id}`)
     let collector = message.createReactionCollector({});
 
-    collector.on('collect', async (reaction, user) => {
+    const poll = this.getPollByDiscordMessageId(message.id)
+
+    const allowedEmojis = poll.allowed_emojis as string
+    const emojis = Array.from(allowedEmojis)
+
+    // add missing votes
+    for (let i=0; i < emojis.length; i+=2) { 
+      const reaction = message.reactions.cache.get(emojis[i])
+      if (!reaction) continue
+      const users = await reaction.users.fetch()  
+      //console.log(users)
+      for (const user of users.values()) {
+        if (user.bot) continue
+        const daoUser = this.getUsersByDiscordUserId(user.id.toString())
+        if (daoUser.length) {
+          this.createPollVote(poll.discord_guild_id, poll.id, daoUser[0].id, emojis[i]);
+          await reaction.remove()
+        }
+      }
+    }
+
+    //message.reactions.removeAll()
+
+
+    for (let i=0; i < emojis.length; i+=2) { 
+      message.react(emojis[i])
+    }
+
+    collector.on('collect', async (reaction, discordUser) => {
       //console.log('reaction added', reaction, user);
-      await this.createPollVote(message.guildId, message.id, user.id, reaction.emoji.name)
-      await reaction.users.remove(user)
+      const user = this.getUsersByDiscordUserId(discordUser.id.toString())
+      if (user.length === 0) {
+        logger.warn("cannot find user for reaction", discordUser.id)
+        return
+      }
+      if (poll === undefined) {
+        logger.warn("the poll is undefined for", message.id)
+        return 
+      }
+      await this.createPollVote(message.guildId, poll.id, user[0].id, reaction.emoji.name)
+      await reaction.users.remove(discordUser)
     });
+  }
+
+  getVotesForUsers(userIds: number[]) {
+    return this.db.prepare(`
+    select pv.*, p.* from poll_votes pv, polls p where pv.poll_id = p.id and user_id in (${userIds.join(',')})
+    `).all({userIds})
   }
 
   getUsersByDiscordUserId(id: string) {
@@ -881,6 +1076,7 @@ export class DAOService extends BaseService {
     }
     const rows = this.db.prepare(`
       SELECT * FROM accounts WHERE discord_user_id = @id
+      ORDER BY id
     `).all({id})
     if (config.dao_requires_encryption_key) {
       // TODO handle guild id
@@ -892,6 +1088,29 @@ export class DAOService extends BaseService {
       }
     }
     return rows
+  }
+
+  getTwitterUsersByUserIds(ids: string[]) {
+
+    const rows = this.db.prepare(`
+    select * from accounts a, twitter_accounts ta 
+    where a.twitter_user_id = ta.twitter_user_id 
+    and a.id in (@ids)
+    `).all({ids: ids.join(',')})
+    if (config.dao_requires_encryption_key) {
+      // TODO handle guild id
+      const key = this.encryptionKeys.values().next().value
+      for (const row of rows) {
+        row.discord_user_id = decrypt(row.discord_user_id, key)
+        row.twitter_user_id = decrypt(row.twitter_user_id, key)
+        row.twitter_created_at = decrypt(row.twitter_created_at, key)
+        row.twitter_name = decrypt(row.twitter_name, key)
+        row.twitter_username = decrypt(row.twitter_username, key)
+        row.access_token = decrypt(row.access_token, key)
+        row.refresh_token = decrypt(row.refresh_token, key)
+      }
+    }
+    return rows    
   }
 
   getTwitterUsersByDiscordUserId(id: string) {
@@ -929,6 +1148,21 @@ export class DAOService extends BaseService {
     const row = this.db.prepare(`
       SELECT * FROM accounts WHERE lower(web3_public_key) = lower(@wallet)
     `).get({wallet})
+
+    // TODO handle guild id
+    if (config.dao_requires_encryption_key && row) {
+      const key = this.encryptionKeys.values().next().value
+      row.discord_user_id = decrypt(row.discord_user_id, key)
+      row.discord_username = decrypt(row.discord_username, key)
+      row.web3_public_key = decrypt(row.web3_public_key, key)
+    }
+    return row
+  }
+
+  getUserById(id: number) {
+    const row = this.db.prepare(`
+      SELECT * FROM accounts WHERE id = @id
+    `).get({id})
 
     // TODO handle guild id
     if (config.dao_requires_encryption_key && row) {

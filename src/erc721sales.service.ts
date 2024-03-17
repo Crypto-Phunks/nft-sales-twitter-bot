@@ -93,6 +93,7 @@ export class Erc721SalesService extends BaseService {
       } catch (err) {
         console.log(err)
         retryCount++
+        await new Promise( resolve => setTimeout(resolve, 500*retryCount) )
         if (retryCount > 5) {
           console.log(`stop retrying, failing on ${latestTweetedTx}, moving to next block`)
           this.currentBlock = latestTweetedBlock + 1 
@@ -132,8 +133,9 @@ export class Erc721SalesService extends BaseService {
         const code = await this.provider.getCode(to)
         // the ignoreContracts flag make the MEV bots like transaction ignored by the twitter
         // bot, but not for statistics
-        if (to !== config.nftx_vault_contract_address && code !== '0x' && ignoreContracts) {
-          logger.info(`contract detected for ${tx.transactionHash} event index ${tx.index}`)
+        if (to !== config.nftx_vault_contract_address && code !== '0x' 
+          && ignoreContracts && !config.allowed_contracts.includes(to)) {
+          logger.info(`contract detected for ${tx.transactionHash} event index ${tx.index} to ${to}, ignoring...`)
           return
         }
         
