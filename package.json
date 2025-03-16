@@ -57,7 +57,7 @@
     "rxjs": "^7.2.0",
     "service": "^0.1.4",
     "svg2img": "^1.0.0-beta.2",
-    "twitter-api-v2": "^1.15.0",
+    "twitter-api-v2": "^1.20.2",
     "web3-utils": "^1.7.1",
     "winston": "^3.10.0",
     "winston-daily-rotate-file": "^4.7.1",

@@ -54,9 +54,8 @@ export default class TwitterClient {
     }
   }
   
-  uploadMedia(processedImage: Buffer, options: { mimeType: EUploadMimeType; }): string | PromiseLike<string> {
-    this.client.appLogin
-    return this.client.v1.uploadMedia(processedImage, options);
+  uploadMedia(processedImage: Buffer, options: { media_type: EUploadMimeType; }): string | PromiseLike<string> {
+    return this.client.v2.uploadMedia(processedImage, options)
   }
   
   tweet(tweetText: string, options:any): any {

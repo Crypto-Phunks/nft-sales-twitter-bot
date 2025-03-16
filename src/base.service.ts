@@ -273,7 +273,7 @@ export class BaseService {
     if (processedImage) {
       // Upload the item's image to Twitter & retrieve a reference to it
       media_id = await this.twitterClient.uploadMedia(processedImage, {
-        mimeType: EUploadMimeType.Png,
+        media_type: EUploadMimeType.Png,
       });
     }
 
