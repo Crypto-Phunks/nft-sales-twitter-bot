@@ -41,10 +41,15 @@ getCryptoToFiat()
 
 async function getCryptoToFiat() {
   logger.info('refreshing fiat values')
-  const endpoint = `https://api.coingecko.com/api/v3/simple/price?ids=ethereum,dai,usdc&vs_currencies=usd`;
+  const endpoint = `https://punkcdn.com/data/coin-price?id=ethereum`;
   const res = await fetch(endpoint)  
   const data = await res.json() as any
-  fiatValues = { 'usdc': { 'usd': 1 }, ...data }
+  const ethValue = data.current_price
+  fiatValues = { 
+    'usdc': { 'usd': 1 },  
+    'dai': { 'usd': 1 },
+    'ethereum': { 'usd': ethValue }
+  }
   logger.info(`fiat values set to ${JSON.stringify(fiatValues)}`)
 
   setTimeout(() => getCryptoToFiat(), 300000)
