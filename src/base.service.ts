@@ -40,27 +40,35 @@ let fiatValues = {}
 getCryptoToFiat()
 
 async function getCryptoToFiat() {
-  logger.info('refreshing fiat values')
+  logger.info('refreshing fiat values');
   try {
-    const endpoint = `https://api.alchemy.com/prices/v1/${alchemyAPIKey}/tokens?symbol=ETH&currency=USD`;
-    const res = await fetch(endpoint)
-    const data = await res.json() as any
-    const ethValue = data?.data?.[0]?.prices?.[0]?.value
+    const apiKey = alchemyAPIKey;
+    const symbols = ['ETH'];
+    const endpoint = `https://api.g.alchemy.com/prices/v1/${apiKey}/tokens/by-symbol?symbols=${symbols.join(',')}&currency=USD`;
+    const res = await fetch(endpoint, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    const data = await res.json() as any;
+    const ethEntry = data?.data?.find((e: any) => e.symbol === 'ETH');
+    const ethValue = ethEntry?.prices?.[0]?.value;
     if (!ethValue) {
-      logger.warn('failed to get ETH price from Alchemy, using fallback')
-      throw new Error('Invalid response from Alchemy API')
+      logger.warn('failed to get ETH price from Alchemy, using fallback');
+      throw new Error('Invalid response from Alchemy Prices API');
     }
-    fiatValues = { 
-      'usdc': { 'usd': 1 },  
-      'dai': { 'usd': 1 },
-      'ethereum': { 'usd': ethValue }
-    }
-    logger.info(`fiat values set to ${JSON.stringify(fiatValues)}`)
+    fiatValues = {
+      usdc: { usd: 1 },
+      dai:  { usd: 1 },
+      ethereum: { usd: ethValue }
+    };
+    logger.info(`fiat values set to ${JSON.stringify(fiatValues)}`);
   } catch (error) {
-    logger.error(`error fetching ETH price from Alchemy: ${error}`)
+    logger.error(`error fetching ETH price from Alchemy: ${error}`);
   }
-  setTimeout(() => getCryptoToFiat(), 300000)
+  setTimeout(() => getCryptoToFiat(), 300000);
 }
+
 
 if (!global.noWatchdog && !global.doNotStartAutomatically) {
   startWatchdog()
