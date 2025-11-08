@@ -40,15 +40,35 @@ let fiatValues = {}
 getCryptoToFiat()
 
 async function getCryptoToFiat() {
-  logger.info('refreshing fiat values')
-  const endpoint = `https://api.coingecko.com/api/v3/simple/price?ids=ethereum,dai,usdc&vs_currencies=usd`;
-  const res = await fetch(endpoint)  
-  const data = await res.json() as any
-  fiatValues = { 'usdc': { 'usd': 1 }, ...data }
-  logger.info(`fiat values set to ${JSON.stringify(fiatValues)}`)
-
-  setTimeout(() => getCryptoToFiat(), 300000)
+  logger.info('refreshing fiat values');
+  try {
+    const apiKey = alchemyAPIKey;
+    const symbols = ['ETH'];
+    const endpoint = `https://api.g.alchemy.com/prices/v1/${apiKey}/tokens/by-symbol?symbols=${symbols.join(',')}&currency=USD`;
+    const res = await fetch(endpoint, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    const data = await res.json() as any;
+    const ethEntry = data?.data?.find((e: any) => e.symbol === 'ETH');
+    const ethValue = ethEntry?.prices?.[0]?.value;
+    if (!ethValue) {
+      logger.warn('failed to get ETH price from Alchemy, using fallback');
+      throw new Error('Invalid response from Alchemy Prices API');
+    }
+    fiatValues = {
+      usdc: { usd: 1 },
+      dai:  { usd: 1 },
+      ethereum: { usd: ethValue }
+    };
+    logger.info(`fiat values set to ${JSON.stringify(fiatValues)}`);
+  } catch (error) {
+    logger.error(`error fetching ETH price from Alchemy: ${error}`);
+  }
+  setTimeout(() => getCryptoToFiat(), 300000);
 }
+
 
 if (!global.noWatchdog && !global.doNotStartAutomatically) {
   startWatchdog()
@@ -202,8 +222,21 @@ export class BaseService {
   }
 
   async dispatch(data: TweetRequest) {
-    const tweet = await this.tweet(data)
-    await this.discord(data, tweet.id)
+    let tweetId = '-1'
+    if (config.ignore_these_platforms.includes(data.platform)) {
+      logger.info(`ignoring ${data.platform} platform`)
+      return
+    }
+    if (process.env.DISABLE_TWEETS !== 'true') {
+      try {
+        const tweet = await this.tweet(data)
+        tweetId = tweet.id
+      } catch (error) {
+        logger.error(`error while tweeting ${error}`, error)
+      }
+    }
+    if (process.env.DISABLE_DISCORD === 'true') return
+    await this.discord(data, tweetId)
   }
   
   async discord(data: TweetRequest, 
@@ -245,7 +278,7 @@ export class BaseService {
     let tweetText = this.formatText(data, template)
 
     // Delay tweets when running live
-    if (!global.doNotStartAutomatically)
+    if (!global.doNotStartAutomatically && config.do_no_delay_tweets !== true)
       await new Promise( resolve => setTimeout(resolve, 30000) );
     
     // Format our image to base64
@@ -260,7 +293,7 @@ export class BaseService {
     if (processedImage) {
       // Upload the item's image to Twitter & retrieve a reference to it
       media_id = await this.twitterClient.uploadMedia(processedImage, {
-        mimeType: EUploadMimeType.Png,
+        media_type: EUploadMimeType.Png,
       });
     }
 
@@ -315,7 +348,6 @@ export class BaseService {
       data.platform
     template = template.replace(new RegExp('<platform>', 'g'), platform);
     template = template.replace(new RegExp('<additionalText>', 'g'), data.additionalText);
-
 
     if (config.enable_flashbot_detection && data.eventType !== 'loans')
       template += ` — Flashbots Protect RPC: ${this.isTransactionFlashbotted(data.transactionHash) ? 'Yes' : 'No'}`
